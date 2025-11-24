@@ -51,6 +51,8 @@ Solder the 4 SPI connections, plus power and ground. The wires **MUST** be solde
 | 14 D/C# | IO5 |
 | 16 CS# | IO26 |
 
+<img src="https://github.com/user-attachments/assets/a0ac50ab-f8d4-4528-ac38-7fb4c9ac0137" align="center">
+
 ### Installing the firmware
 
 The project uses the Arduino framework and the ESP32 v3.2.0 core. If you want to build from source, you'll need [PlatformIO](https://platformio.org).
