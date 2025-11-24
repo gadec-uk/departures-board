@@ -40,7 +40,7 @@ As supplied, the display is usually shipped with 8-bit 80XX mode enabled. This n
 
 ### Wiring Guide
 
-Solder the 4 SPI connections, plus power and ground. The wires **MUST** be soldered to the **BACK** of the ESP32 Mini board (the side without the components) to enable it to sit in place in the case.
+Solder the 4 SPI connections, plus power and ground. The wires **MUST** be soldered to the **BACK** of the ESP32 Mini board (the side without the components) to enable it to sit in place in the case. You can solder directly to the pins on the OLED screen or for the best fit (if you are a more experienced solderer) de-solder and remove the header pins and solder directly to the board. You cannot use Dupont connectors, they will not fit the custom case design.
 
 | OLED Pin | ESP32 Mini Pin |
 |:---------|:-------------:|
