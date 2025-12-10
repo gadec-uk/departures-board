@@ -106,7 +106,8 @@ void weatherClient::value(String value) {
         if (currentKey == "description") description = value;
     }
     else if (currentKey == "temp") temperature = value.toFloat();
-    else if (currentKey == "speed") windSpeed = value.toFloat();
+    // Windspeed reported in mps, converting to mph
+    else if (currentKey == "speed") windSpeed = value.toFloat() * 2.23694;
 }
 
 void weatherClient::endArray() {}

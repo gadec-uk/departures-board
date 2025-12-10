@@ -1,6 +1,6 @@
 // Common station data structures shared by both data clients
 #pragma once
-#include <arduino.h>
+#include <Arduino.h>
 
 #define MAXBOARDMESSAGES 4
 #define MAXMESSAGESIZE 400
