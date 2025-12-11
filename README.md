@@ -7,6 +7,7 @@ This is an ESP32 based mini Departures Board replicating those at many UK railwa
 * Smooth animation matching the real departures and arrivals boards
 * Displays up to the next 9 departures with platform, calling stations and expected departure time
 * Optionally only show services calling at a selected station
+* Optionally display an alternate station between specific hours of the day
 * Network Rail service messages
 * Train information (operator, class, number of coaches etc.)
 * Displays up to the next 9 arrivals with time to station (London Underground mode)
@@ -85,13 +86,14 @@ Subsequent updates can be carried out automatically over-the-air or you can manu
 WiFiManager is used to setup the initial WiFi connection on first boot. The ESP32 will broadcast a temporary WiFi network named "Departures Board", connect to the network and follow the on-screen instuctions. You can also watch a video walkthrough of the entire process below.
 [![Departures Board Setup Video](https://github.com/user-attachments/assets/176f0489-d846-42de-913f-eb838d9ab941)](https://youtu.be/bMyI56zwHyc)
 
-Once the ESP32 has established an Internet connection, the Web GUI files will be downloaded and installed from the latest release on GitHub. The next step is to enter your National Rail API token (and optionally, your OpenWeather Map and Transport for London API tokens). Finally, select a station location. Start typing the location name and valid choices will be displayed as you type.
+Once the ESP32 has established an Internet connection, the next step is to enter your National Rail API token (and optionally, your OpenWeather Map and Transport for London API tokens). Finally, select a station location. Start typing the location name and valid choices will be displayed as you type.
 
 ### Web GUI
 
 At start-up, the ESP32's IP address is displayed. To change the station or to configure other miscellaneous settings, open the web page at that address. The settings available are:
 - **Station** - start typing a few characters of a station name and select from the drop-down station picker displayed (National Rail mode).
 - **Only show services calling at** - filter services based on *calling at* location (National Rail mode - if you want to see the next trains *to* a particular station).
+- **Alternate station** - automatically switch to displaying an alternate station between the hours set here (National Rail mode).
 - **Underground Station** - start typing a few characters of an Underground or DLR station name and select from the drop-down station picker displayed (London Underground mode).
 - **Brightness** - adjusts the brightness of the OLED screen.
 - **London Underground Arrivals Board Mode** - switch between National Rail Departures Board and London Underground Arrivals Board modes.
