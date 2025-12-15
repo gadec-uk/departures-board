@@ -5,7 +5,7 @@ This is an ESP32 based mini Departures Board replicating those at many UK railwa
 ## Features
 * All processing is done onboard by the ESP32 processor
 * Smooth animation matching the real departures and arrivals boards
-* Displays up to the next 9 departures with platform, calling stations and expected departure time
+* Displays up to the next 9 departures with scheduled time, platform number, destination, calling stations and expected departure time
 * Optionally only show services calling at a selected station
 * Optionally display an alternate station between specific hours of the day
 * Network Rail service messages
@@ -118,6 +118,11 @@ A few other urls have been implemented, primarily for debugging/developer use:
 - **/formatffs** - formats the filing system, erasing the configuration & Web GUI (but not the WiFi credentials).
 - **/dir** - displays a (basic) directory listing of the file system with the ability to view/delete files.
 - **/upload** - upload a file to the file system.
+
+### Donating
+
+<a href="https://buymeacoffee.com/gadec.uk"><img src="https://github.com/user-attachments/assets/e5960046-051a-45af-8730-e23d4725ab53" align="left" width="160" style="margin-right: 15px;" /></a>
+You are free to use, copy and modify this project under the terms of the license below without obligation. If you would like to support me and encourage ongoing updates, you can [buy me a coffee!](https://buymeacoffee.com/gadec.uk)
 
 ### License
 This work is licensed under **Creative Commons Attribution-NonCommercial-ShareAlike 4.0**. To view a copy of this license, visit [https://creativecommons.org/licenses/by-nc-sa/4.0/](https://creativecommons.org/licenses/by-nc-sa/4.0/)
