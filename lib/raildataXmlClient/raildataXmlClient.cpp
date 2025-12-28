@@ -327,7 +327,7 @@ int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *message
     }
 
     httpsClient.stop();
-    if (bChunked) lastErrorMessage = "WARNING: Chunked response! ";
+    if (bChunked) lastErrorMessage = F("WARNING: Chunked response! ");
     if (millis() >= dataSendTimeout) {
         lastErrorMessage += F("Timed out during data receive operation - ");
         lastErrorMessage += String(dataReceived) + F(" bytes received");
@@ -648,9 +648,9 @@ void raildataXmlClient::value(const char *value)
 void raildataXmlClient::attribute(const char *attr)
 {
     if (loadingWDSL) {
-        if (tagName == "soap:address") {
+        if (tagName == F("soap:address")) {
             String myURL = String(attr);
-            if (myURL.startsWith("location=\"") && myURL.endsWith("\"")) {
+            if (myURL.startsWith(F("location=\"")) && myURL.endsWith(F("\""))) {
                 soapURL = myURL.substring(10,myURL.length()-1);
             }
         }

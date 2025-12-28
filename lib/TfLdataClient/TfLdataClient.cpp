@@ -215,7 +215,7 @@ int TfLdataClient::updateArrivals(rdStation *station, stnMessages *messages, con
     messages->numMessages = xMessages.numMessages;
     for (int i=0;i<xMessages.numMessages;i++) strcpy(messages->messages[i],xMessages.messages[i]);
 
-    if (bChunked) lastErrorMsg = "WARNING: Chunked response! ";
+    if (bChunked) lastErrorMsg = F("WARNING: Chunked response! ");
     if (station->boardChanged) {
         lastErrorMsg += F("SUCCESS [Primary Service Changed] Update took: ");
         lastErrorMsg += String(millis() - perfTimer) + F("ms [") + String(dataReceived) + F("]");
@@ -275,7 +275,7 @@ void TfLdataClient::startDocument() {}
 
 void TfLdataClient::key(String key) {
     currentKey = key;
-    if (currentKey == "id") {
+    if (currentKey == F("id")) {
         // Next entry
         if (xStation.numServices<UGMAXREADSERVICES) {
             xStation.numServices++;
@@ -284,7 +284,7 @@ void TfLdataClient::key(String key) {
             // We've read all we need to
             maxServicesRead = true;
         }
-    } else if (currentKey == "description") {
+    } else if (currentKey == F("description")) {
         // Next service message
         if (xMessages.numMessages<MAXBOARDMESSAGES) {
             xMessages.numMessages++;

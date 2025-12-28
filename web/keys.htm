@@ -19,8 +19,8 @@
             <legend style="text-align: center;">Departures Board Setup</legend>
             <div class="form-group">
             <label class="control-label" for="nrKey">National Rail Token</label>
-                <input id="nrKey" type="text" placeholder="Enter your 36 character token" class="form-control input-md">
-                <span class="help-block">You will need a National Rail Enquiries Darwin Lite Webservice token. Enter the token exactly as received (in the format nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn). You can register for a token free of charge <a href="https://realtime.nationalrail.co.uk/OpenLDBWSRegistration" target="_blank">here</a>.</span>
+                <input id="nrKey" type="text" placeholder="Optionally, enter your 36 character token" class="form-control input-md">
+                <span class="help-block">You will need a National Rail Enquiries Darwin Lite Webservice token if you wish to display National Rail departures. Enter the token exactly as received (in the format nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn). You can register for a token free of charge <a href="https://realtime.nationalrail.co.uk/OpenLDBWSRegistration" target="_blank">here</a>.</span>
             </div>
             <div class="form-group">
                 <label class="control-label" for="owmKey">OpenWeather Map API Key</label>
@@ -29,7 +29,7 @@
             </div>
             <div class="form-group">
                 <label class="control-label" for="appKey">Transport for London API Key</label>
-                <input id="appKey" type="text" placeholder="Optionally, enter your TfL App key" class="form-control input-md">
+                <input id="appKey" type="text" placeholder="Optionally, enter your 32 character TfL App key" class="form-control input-md">
                 <span class="help-block">Enter your Transport for London api key (app_key) if you wish to display London Underground station arrivals. You can register for a free api key <a href="https://api-portal.tfl.gov.uk/signup" target="_blank">here</a>.</span>
             </div>
             <div class="form-group" style="text-align: center;">
@@ -43,11 +43,21 @@
     <script>
         $(document).ready(function() {
             const nrKeyPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+            const tflKeyPattern = /^[a-f0-9]{32}$/;
 
-            function validateNrKey() {
-                const val = $('#nrKey').val().trim();
-                const isValid = nrKeyPattern.test(val);
-                $('#save').prop('disabled', !isValid);
+            function validateKeys() {
+                const nrVal  = $('#nrKey').val().trim();
+                const tflVal = $('#appKey').val().trim();
+
+                const nrEntered  = nrVal.length > 0;
+                const tflEntered = tflVal.length > 0;
+
+                const nrValid  = !nrEntered  || nrKeyPattern.test(nrVal);
+                const tflValid = !tflEntered || tflKeyPattern.test(tflVal);
+
+                const enableSave = (nrEntered || tflEntered) && nrValid && tflValid;
+
+                $('#save').prop('disabled', !enableSave);
             }
 
             // Initial disable
@@ -65,12 +75,12 @@
                     $('#appKey').val(data.appKey);
                 }
                 // Validate after loading
-                validateNrKey();
+                validateKeys();
             });
 
             // Validate on input
-            $('#nrKey').on('input', function () {
-                validateNrKey();
+            $('#nrKey, #appKey').on('input', function () {
+                validateKeys();
             });
 
             $('#save').click(function () {

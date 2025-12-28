@@ -88,7 +88,7 @@ bool weatherClient::updateWeather(String apiKey, String lat, String lon) {
 
     lastErrorMsg="";
 
-    currentWeather = description + " " + String((int)round(temperature)) + "\x80 Wind: " + String((int)round(windSpeed)) + "mph";
+    currentWeather = description + " " + String((int)round(temperature)) + F("\x80 Wind: ") + String((int)round(windSpeed)) + F("mph");
     return true;
 }
 
@@ -101,19 +101,19 @@ void weatherClient::key(String key) {
 }
 
 void weatherClient::value(String value) {
-    if (currentObject == "weather" && weatherItem==0) {
+    if (currentObject == F("weather") && weatherItem==0) {
         // Only read the first weather entry in the array
-        if (currentKey == "description") description = value;
+        if (currentKey == F("description")) description = value;
     }
-    else if (currentKey == "temp") temperature = value.toFloat();
+    else if (currentKey == F("temp")) temperature = value.toFloat();
     // Windspeed reported in mps, converting to mph
-    else if (currentKey == "speed") windSpeed = value.toFloat() * 2.23694;
+    else if (currentKey == F("speed")) windSpeed = value.toFloat() * 2.23694;
 }
 
 void weatherClient::endArray() {}
 
 void weatherClient::endObject() {
-    if (currentObject == "weather") weatherItem++;
+    if (currentObject == F("weather")) weatherItem++;
     currentObject = "";
 }
 

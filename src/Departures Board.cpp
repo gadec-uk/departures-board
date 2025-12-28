@@ -20,9 +20,7 @@
 
 // Release version number
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 6
-#define WEBAPPVER_MAJOR 1
-#define WEBAPPVER_MINOR 3
+#define VERSION_MINOR 7
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -272,6 +270,11 @@ static const uint8_t UndergroundClock8[150] U8G2_FONT_SECTION("UndergroundClock8
 //
 github ghUpdate("");
 
+#define SCREENSAVERINTERVAL 10000     // How often the screen is changed in sleep mode (ms - 10 seconds)
+#define DATAUPDATEINTERVAL 150000     // How often we fetch data from National Rail (ms - 2.5 mins) - "default" option
+#define FASTDATAUPDATEINTERVAL 45000  // How often we fetch data from National Rail (ms - 45 secs) - "fast" option
+#define UGDATAUPDATEINTERVAL 30000    // How often we fetch data from TfL (ms - 30 secs)
+
 // Bit and bobs
 unsigned long timer = 0;
 bool isSleeping = false;            // Is the screen sleeping (showing the "screensaver")
@@ -348,15 +351,12 @@ bool showingMessage = false;
 // TfL specific animation
 int scrollPrimaryYpos = 0;
 bool isScrollingPrimary = false;
+bool tflAttribution = false;
 
 char displayedTime[29] = "";        // The currently displayed time
 unsigned long nextClockUpdate = 0;  // Next time we need to check/update the clock display
 int fpsDelay=25;                    // Total ms between text movement (for smooth animation)
 unsigned long refreshTimer = 0;
-
-#define SCREENSAVERINTERVAL 10000   // How often the screen is changed in sleep mode (ms - 10 seconds)
-#define DATAUPDATEINTERVAL 150000   // How often we fetch data from National Rail (ms - 2.5 mins)
-#define UGDATAUPDATEINTERVAL 30000  // How often we fetch data from TfL (ms - 30 secs)
 
 // Weather Stuff
 char weatherMsg[46];                            // Current weather at station location
@@ -367,6 +367,7 @@ weatherClient currentWeather;                   // Create a weather client
 bool noDataLoaded = true;                       // True if no data received for the station
 int lastUpdateResult = 0;                       // Result of last data refresh
 unsigned long lastDataLoadTime = 0;             // Timestamp of last data load
+long apiRefreshRate = DATAUPDATEINTERVAL;       // User selected refresh rate for National Rail API
 
 #define MAXHOSTSIZE 48                          // Maximum size of the wsdl Host
 #define MAXAPIURLSIZE 48                        // Maximum size of the wsdl url
@@ -674,7 +675,7 @@ void showFirmwareUpdateProgress(int percent) {
   u8g2.sendBuffer();
 }
 
-void showUpdateCompleteScreen(const char *title, const char *msg1, const char *msg2, int secs, bool showReboot) {
+void showUpdateCompleteScreen(const char *title, const char *msg1, const char *msg2, const char *msg3, int secs, bool showReboot) {
   char countdown[60];
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
@@ -682,9 +683,10 @@ void showUpdateCompleteScreen(const char *title, const char *msg1, const char *m
   u8g2.setFont(NatRailSmall9);
   centreText(msg1,14);
   centreText(msg2,26);
+  centreText(msg3,40);
   if (showReboot) sprintf(countdown,"The system will restart in %d seconds.",secs);
   else sprintf(countdown,"The system will continue in %d seconds.",secs);
-  centreText(countdown,40);
+  centreText(countdown,54);
   u8g2.sendBuffer();
 }
 
@@ -798,6 +800,14 @@ void loadApiKeys() {
   }
 }
 
+// Write a default config file so that the Web GUI works initially (force Tube mode if no NR token)
+void writeDefaultConfig() {    
+    String defaultConfig = "{\"crs\":\"\",\"station\":\"\",\"lat\":0,\"lon\":0,\"weather\":" + String((openWeatherMapApiKey.length())?"true":"false") + F(",\"sleep\":false,\"showDate\":false,\"showBus\":false,\"update\":true,\"sleepStarts\":23,\"sleepEnds\":8,\"brightness\":20,\"tubeId\":\"\",\"tubeName\":\"\",\"tube\":") + String((!nrToken[0])?"true":"false") + "}";
+    saveFile(F("/config.json"),defaultConfig);
+    strcpy(crsCode,"");
+    strcpy(tubeId,"");
+}
+
 // Load the configuration settings (if they exist, if not create a default set for the Web GUI page to read)
 void loadConfig() {
   JsonDocument doc;
@@ -810,22 +820,23 @@ void loadConfig() {
         JsonObject settings = doc.as<JsonObject>();
 
         if (settings[F("crs")].is<const char*>())        strlcpy(crsCode, settings[F("crs")], sizeof(crsCode));
-        if (settings["callingCrs"].is<const char*>()) strlcpy(callingCrsCode, settings["callingCrs"], sizeof(callingCrsCode));
-        if (settings["callingStation"].is<const char*>()) strlcpy(callingStation, settings["callingStation"], sizeof(callingStation));
-        if (settings["hostname"].is<const char*>())   strlcpy(hostname, settings["hostname"], sizeof(hostname));
-        if (settings["wsdlHost"].is<const char*>())   strlcpy(wsdlHost, settings["wsdlHost"], sizeof(wsdlHost));
-        if (settings["wsdlAPI"].is<const char*>())    strlcpy(wsdlAPI, settings["wsdlAPI"], sizeof(wsdlAPI));
-        if (settings["showDate"].is<bool>())          dateEnabled = settings["showDate"];
-        if (settings["showBus"].is<bool>())           enableBus = settings["showBus"];
-        if (settings["sleep"].is<bool>())             sleepEnabled = settings["sleep"];
-        if (settings["weather"].is<bool>() && openWeatherMapApiKey.length())
-                                                    weatherEnabled = settings["weather"];
-        if (settings["update"].is<bool>())            firmwareUpdates = settings["update"];
-        if (settings["sleepStarts"].is<int>())        sleepStarts = settings["sleepStarts"];
-        if (settings["sleepEnds"].is<int>())          sleepEnds = settings["sleepEnds"];
-        if (settings["brightness"].is<int>())         brightness = settings["brightness"];
-        if (settings["lat"].is<float>())              stationLat = settings["lat"];
-        if (settings["lon"].is<float>())              stationLon = settings["lon"];
+        if (settings[F("callingCrs")].is<const char*>()) strlcpy(callingCrsCode, settings[F("callingCrs")], sizeof(callingCrsCode));
+        if (settings[F("callingStation")].is<const char*>()) strlcpy(callingStation, settings[F("callingStation")], sizeof(callingStation));
+        if (settings[F("hostname")].is<const char*>())   strlcpy(hostname, settings[F("hostname")], sizeof(hostname));
+        if (settings[F("wsdlHost")].is<const char*>())   strlcpy(wsdlHost, settings[F("wsdlHost")], sizeof(wsdlHost));
+        if (settings[F("wsdlAPI")].is<const char*>())    strlcpy(wsdlAPI, settings[F("wsdlAPI")], sizeof(wsdlAPI));
+        if (settings[F("showDate")].is<bool>())          dateEnabled = settings[F("showDate")];
+        if (settings[F("showBus")].is<bool>())           enableBus = settings[F("showBus")];
+        if (settings[F("sleep")].is<bool>())             sleepEnabled = settings[F("sleep")];
+        if (settings[F("fastRefresh")].is<bool>())       apiRefreshRate = settings[F("fastRefresh")] ? FASTDATAUPDATEINTERVAL : DATAUPDATEINTERVAL;
+        if (settings[F("weather")].is<bool>() && openWeatherMapApiKey.length())
+                                                    weatherEnabled = settings[F("weather")];
+        if (settings[F("update")].is<bool>())            firmwareUpdates = settings[F("update")];
+        if (settings[F("sleepStarts")].is<int>())        sleepStarts = settings[F("sleepStarts")];
+        if (settings[F("sleepEnds")].is<int>())          sleepEnds = settings[F("sleepEnds")];
+        if (settings[F("brightness")].is<int>())         brightness = settings[F("brightness")];
+        if (settings[F("lat")].is<float>())              stationLat = settings[F("lat")];
+        if (settings[F("lon")].is<float>())              stationLon = settings[F("lon")];
 
         if (settings[F("tube")].is<bool>())              tubeMode = settings[F("tube")];
         if (settings[F("tubeId")].is<const char*>())     strlcpy(tubeId, settings[F("tubeId")], sizeof(tubeId));
@@ -836,23 +847,18 @@ void loadConfig() {
         else if (tubeName.endsWith(F(" DLR Station"))) tubeName.remove(tubeName.length()-12);
         else if (tubeName.endsWith(F(" (H&C Line)"))) tubeName.remove(tubeName.length()-11);
 
-        if (settings["altCrs"].is<const char*>()) strlcpy(altCrsCode, settings["altCrs"], sizeof(altCrsCode));
+        if (settings[F("altCrs")].is<const char*>())     strlcpy(altCrsCode, settings[F("altCrs")], sizeof(altCrsCode));
         if (altCrsCode[0]) altStationEnabled = true; else altStationEnabled = false;
-        if (settings["altStarts"].is<int>())        altStarts = settings["altStarts"];
-        if (settings["altEnds"].is<int>())          altEnds = settings["altEnds"];
-        if (settings["altLat"].is<float>())         altLat = settings["altLat"];
-        if (settings["altLon"].is<float>())         altLon = settings["altLon"];
+        if (settings[F("altStarts")].is<int>())          altStarts = settings[F("altStarts")];
+        if (settings[F("altEnds")].is<int>())            altEnds = settings[F("altEnds")];
+        if (settings[F("altLat")].is<float>())           altLat = settings[F("altLat")];
+        if (settings[F("altLon")].is<float>())           altLon = settings[F("altLon")];
       } else {
         // JSON deserialization failed - TODO
       }
       file.close();
     }
-  } else {
-    // Write a default config file so that the Web GUI works initially
-    String defaultConfig = "{\"crs\":\"\",\"station\":\"\",\"lat\":0,\"lon\":0,\"weather\":" + String((openWeatherMapApiKey.length())?"true":"false") + F(",\"sleep\":false,\"showDate\":false,\"showBus\":false,\"update\":true,\"sleepStarts\":23,\"sleepEnds\":8,\"brightness\":20,\"tube\":false}");
-    saveFile("/config.json",defaultConfig);
-    strcpy(crsCode,"");
-  }
+  } else if (nrToken[0] || tflAppkey.length()) writeDefaultConfig();
 }
 
 // Switch to the alternate station settings if appropriate
@@ -990,22 +996,22 @@ bool checkForFirmwareUpdate() {
       char msg[60];
       sprintf(msg,"The update failed with error %d.",httpUpdate.getLastError());
       result=false;
-      for (int i=15;i>=0;i--) {
-        showUpdateCompleteScreen(msgTitle,msg,httpUpdate.getLastErrorString().c_str(),i,false);
+      for (int i=20;i>=0;i--) {
+        showUpdateCompleteScreen(msgTitle,msg,httpUpdate.getLastErrorString().c_str(),"",i,false);
         delay(1000);
       }
       break;
 
     case HTTP_UPDATE_NO_UPDATES:
       for (int i=10;i>=0;i--) {
-        showUpdateCompleteScreen(msgTitle,"","No firmware updates were available.",i,false);
+        showUpdateCompleteScreen(msgTitle,"","No firmware updates were available.","",i,false);
         delay(1000);
       }
       break;
 
     case HTTP_UPDATE_OK:
-      for (int i=10;i>=0;i--) {
-        showUpdateCompleteScreen(msgTitle,"The firmware update has completed successfully.","",i,true);
+      for (int i=20;i>=0;i--) {
+        showUpdateCompleteScreen(msgTitle,"The firmware update has completed successfully.","For more information visit the URL below:","github.com/gadec-uk/departures-board/releases",i,true);
         delay(1000);
       }
       ESP.restart();
@@ -1025,7 +1031,7 @@ bool checkForFirmwareUpdate() {
 bool getStationBoard() {
   if (!firstLoad) showUpdateIcon(true);
   lastUpdateResult = raildata->updateDepartures(&station,&messages,crsCode,nrToken,MAXBOARDSERVICES,enableBus,callingCrsCode);
-  nextDataUpdate = millis()+DATAUPDATEINTERVAL; // default update freq
+  nextDataUpdate = millis()+apiRefreshRate;
   if (lastUpdateResult == UPD_SUCCESS || lastUpdateResult == UPD_NO_CHANGE) {
     showUpdateIcon(false);
     lastDataLoadTime=millis();
@@ -1387,6 +1393,7 @@ void drawUndergroundService(int serviceId, int y) {
 void drawUndergroundBoard() {
   numMessages = messages.numMessages;
   if (line3Service==0) line3Service=1;
+  tflAttribution=false;
   if (firstLoad) {
     // Clear the entire screen for the first load since boot up/wake from sleep
     u8g2.clearBuffer();
@@ -1518,7 +1525,7 @@ void handleStreamFlashFile(String filename, const uint8_t *filedata, size_t cont
   client.println(contentType);
   client.print(F("Content-Length: "));
   client.println(contentLength);
-  client.println("Connection: close");
+  client.println(F("Connection: close"));
   client.println(); // End of headers
 
   const size_t chunkSize = 512;
@@ -1552,8 +1559,8 @@ void handleSaveKeys() {
     DeserializationError error = deserializeJson(doc, newJSON);
     if (!error) {
       JsonObject settings = doc.as<JsonObject>();
-      if (settings["owmToken"].is<const char*>()) {
-        owmToken = settings["owmToken"].as<String>();
+      if (settings[F("owmToken")].is<const char*>()) {
+        owmToken = settings[F("owmToken")].as<String>();
         if (owmToken.length()) {
           // Check if this is a valid token...
           if (!currentWeather.updateWeather(owmToken, "51.52", "-0.13")) {
@@ -1563,7 +1570,7 @@ void handleSaveKeys() {
         }
       }
       if (result) {
-        if (!saveFile("/apikeys.json",newJSON)) {
+        if (!saveFile(F("/apikeys.json"),newJSON)) {
           msg = F("Failed to save the API keys to the file system (file system corrupt or full?)");
           result = false;
         }
@@ -1576,8 +1583,14 @@ void handleSaveKeys() {
       sendResponse(200,msg);
       // Load/Update the API Keys in memory
       loadApiKeys();
-      // If the station code is blank, we're in the setup process. If not, the keys have been changed so just reboot.
-      if (!crsCode[0]) showSetupCrsHelpScreen(); else { delay(500); ESP.restart(); }
+      // If both the station codes are blank, we're in the setup process. If not, the keys have been changed so just reboot.
+      if (!crsCode[0] && !tubeId[0]) {
+        writeDefaultConfig();
+        showSetupCrsHelpScreen(); 
+      } else {
+        delay(500);
+        ESP.restart();
+      }
     } else {
       sendResponse(400,msg);
     }
@@ -1721,9 +1734,9 @@ void handleFileUpload() {
 
 // Fallback function for browser requests
 void handleNotFound() {
-  if (server.uri() == F("/keys.htm")) handleStreamFlashFile(server.uri(), keyshtm, sizeof(keyshtm));
+  if ((LittleFS.exists(server.uri())) && (server.method() == HTTP_GET)) handleStreamFile(server.uri());
+  else if (server.uri() == F("/keys.htm")) handleStreamFlashFile(server.uri(), keyshtm, sizeof(keyshtm));
   else if (server.uri() == F("/index.htm")) handleStreamFlashFile(server.uri(), indexhtm, sizeof(indexhtm));
-  else if ((LittleFS.exists(server.uri())) && (server.method() == HTTP_GET)) handleStreamFile(server.uri());
   else if (server.uri() == F("/nrelogo.webp")) handleStreamFlashFile(server.uri(), nrelogo, sizeof(nrelogo));
   else if (server.uri() == F("/tfllogo.webp")) handleStreamFlashFile(server.uri(), tfllogo, sizeof(tfllogo));
   else if (server.uri() == F("/tube.webp")) handleStreamFlashFile(server.uri(), tubeicon, sizeof(tubeicon));
@@ -1796,10 +1809,10 @@ void handleInfo() {
 
 // Stream the index.htm page unless we're in first time setup and need the api keys
 void handleRoot() {
-  if (!nrToken[0]) {
-    if (LittleFS.exists(F("/keys_d.htm"))) handleStreamFile(F("/keys_d.htm")); else handleStreamFlashFile("/keys.htm",keyshtm,sizeof(keyshtm));
+  if (!nrToken[0] && tflAppkey=="") {
+    if (LittleFS.exists(F("/keys.htm"))) handleStreamFile(F("/keys.htm")); else handleStreamFlashFile(F("/keys.htm"),keyshtm,sizeof(keyshtm));
   } else {
-    if (LittleFS.exists(F("/index_d.htm"))) handleStreamFile(F("/index_d.htm")); else handleStreamFlashFile("/index.htm",indexhtm,sizeof(indexhtm));
+    if (LittleFS.exists(F("/index_d.htm"))) handleStreamFile(F("/index_d.htm")); else handleStreamFlashFile(F("/index.htm"),indexhtm,sizeof(indexhtm));
   }
 }
 
@@ -1864,8 +1877,8 @@ void handleOtaUpdate() {
   if (ghUpdate.getLatestRelease()) {
     checkForFirmwareUpdate();
   } else {
-    for (int i=10;i>=0;i--) {
-      showUpdateCompleteScreen("Firmware Update Check Failed","Unable to retrieve latest release information.",ghUpdate.getLastError().c_str(),i,false);
+    for (int i=15;i>=0;i--) {
+      showUpdateCompleteScreen("Firmware Update Check Failed","Unable to retrieve latest release information.",ghUpdate.getLastError().c_str(),"",i,false);
       delay(1000);
     }
     log_e("FW Update failed: %s\n",ghUpdate.getLastError().c_str());
@@ -2134,11 +2147,12 @@ void undergroundArrivalsLoop() {
 
     // Scrolling the additional services
   if (millis()>serviceTimer && !isScrollingService && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
-    if (station.numServices<=2 && messages.numMessages==0) {
+    if (station.numServices<=2 && messages.numMessages==1 && tflAttribution) {
       // There are no additional services to scroll in so static attribution.
       serviceTimer = millis() + 30000;
     } else {
       // Need to change to the next service or message if there is one
+      tflAttribution = true;
       prevService = line3Service;
       line3Service++;
       if ((line3Service >= station.numServices && messages.numMessages==0) || (line3Service >= station.numServices+1 && messages.numMessages)) {
@@ -2262,6 +2276,7 @@ void setup(void) {
   strcpy(station.location,"");                // No default location
   strcpy(weatherMsg,"");                      // No weather message
   strcpy(nrToken,"");                         // No default National Rail token
+  tflAppkey="";                               // No default TfL AppKey     
   loadApiKeys();                              // Load the API keys from the apiKeys.json
   loadConfig();                               // Load the configuration settings from config.json
   u8g2.setContrast(brightness);               // Set the panel brightness to the user saved level
@@ -2324,12 +2339,12 @@ void setup(void) {
   server.on(F("/brightness"),handleBrightness);                 // Used by the Web GUI to interactively set the panel brightness
   server.on(F("/ota"),handleOtaUpdate);                         // Used by the Web GUI to initiate a manual firmware/WebApp update
 
-  server.on("/update", HTTP_GET, []() {
+  server.on(F("/update"), HTTP_GET, []() {
     server.sendHeader("Connection", "close");
     server.send(200, contentTypeHtml, updatePage);
   });
   /*handling uploading firmware file */
-  server.on("/update", HTTP_POST, []() {
+  server.on(F("/update"), HTTP_POST, []() {
     server.sendHeader("Connection", "close");
     sendResponse(200,(Update.hasError()) ? "FAIL" : "OK");
     ESP.restart();
@@ -2370,8 +2385,8 @@ void setup(void) {
     if (ghUpdate.getLatestRelease()) {
       checkForFirmwareUpdate();
     } else {
-      for (int i=10;i>=0;i--) {
-        showUpdateCompleteScreen("Firmware Update Check Failed","Unable to retrieve latest release information.",ghUpdate.getLastError().c_str(),i,false);
+      for (int i=15;i>=0;i--) {
+        showUpdateCompleteScreen("Firmware Update Check Failed","Unable to retrieve latest release information.",ghUpdate.getLastError().c_str(),"",i,false);
         delay(1000);
       }
       u8g2.clearDisplay();
@@ -2381,8 +2396,9 @@ void setup(void) {
   }
 
   // First time configuration?
-  if (!crsCode[0] || !nrToken[0]) {
-    if (!nrToken[0]) showSetupKeysHelpScreen(); else showSetupCrsHelpScreen();
+  if ((!crsCode[0] && !tubeId[0]) || (!nrToken[0] && tflAppkey=="")) {
+    if (!nrToken[0] && tflAppkey=="") showSetupKeysHelpScreen();
+    else showSetupCrsHelpScreen();
     // First time setup mode will exit with a reboot, so just loop here forever servicing web requests
     while (true) {
       yield();

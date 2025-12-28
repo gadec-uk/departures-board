@@ -86,13 +86,13 @@ Subsequent updates can be carried out automatically over-the-air or you can manu
 WiFiManager is used to setup the initial WiFi connection on first boot. The ESP32 will broadcast a temporary WiFi network named "Departures Board", connect to the network and follow the on-screen instuctions. You can also watch a video walkthrough of the entire process below.
 [![Departures Board Setup Video](https://github.com/user-attachments/assets/176f0489-d846-42de-913f-eb838d9ab941)](https://youtu.be/bMyI56zwHyc)
 
-Once the ESP32 has established an Internet connection, the next step is to enter your National Rail API token (and optionally, your OpenWeather Map and Transport for London API tokens). Finally, select a station location. Start typing the location name and valid choices will be displayed as you type.
+Once the ESP32 has established an Internet connection, the next step is to enter your API keys (you must provide at least one of the following: a National Rail token or a Transport for London API key). Finally, select a station location. Start typing the location name and valid choices will be displayed as you type.
 
 ### Web GUI
 
 At start-up, the ESP32's IP address is displayed. To change the station or to configure other miscellaneous settings, open the web page at that address. The settings available are:
 - **Station** - start typing a few characters of a station name and select from the drop-down station picker displayed (National Rail mode).
-- **Only show services calling at** - filter services based on *calling at* location (National Rail mode - if you want to see the next trains *to* a particular station).
+- **Only show services calling at** - filter services based on *calling at* location (National Rail mode - if you want to see the next trains *to* a particular station). Note this option cannot be combined with the *Alternate station* feature.
 - **Alternate station** - automatically switch to displaying an alternate station between the hours set here (National Rail mode).
 - **Underground Station** - start typing a few characters of an Underground or DLR station name and select from the drop-down station picker displayed (London Underground mode).
 - **Brightness** - adjusts the brightness of the OLED screen.
@@ -100,12 +100,13 @@ At start-up, the ESP32's IP address is displayed. To change the station or to co
 - **Show the date on screen** - displays the date in the upper-right corner (useful if you're also using this as a desk clock!)
 - **Include Bus services** - optionally include bus replacement services (shown with a small bus icon in place of platform number).
 - **Include current weather at station location** - this option requires a valid OpenWeather Map API key (see above).
-- **Enable automatic firmware updates at startup** - automatically checks for AND installs the latest firmware/Web GUI from this repository.
+- **Increase API refresh rate** - Reduces the interval between data refreshes (National Rail mode). Uses more data and is not usually required.
+- **Enable automatic firmware updates at startup** - automatically checks for AND installs the latest firmware from this repository.
 - **Enable overnight sleep mode (screensaver)** - if you're running the board 24/7, you can help prevent screen burn-in by enabling this option overnight.
 
 A drop-down menu (top-right) adds the following options:
-- **Check for Updates** - manually checks for and installs any updates to the firmware/Web GUI.
-- **Edit API Keys** - view/edit your National Rail / OpenWeather Map API keys.
+- **Check for Updates** - manually checks for and installs any updates to the firmware.
+- **Edit API Keys** - view/edit your National Rail, OpenWeather Map and Transport for London API keys.
 - **Clear WiFi Settings** - deletes the stored WiFi credentials and restarts in WiFiManager mode (useful to change WiFi network).
 - **Restart System** - restarts the ESP32.
 

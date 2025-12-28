@@ -13,6 +13,22 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml"/>
     <title>Departures Board</title>
 </head>
+<style>
+.dropdown-submenu {
+  position: relative;
+}
+
+.dropdown-submenu > .dropdown-menu {
+  top: 0;
+  left: -100%;
+  margin-top: -1px;
+}
+
+.tick {
+  display: inline-block;
+  width: 16px;
+}
+</style>
 <body>
   <div style="width: min(90%, 500px); margin: 0 auto; padding: 0 5px;">
     <form id="formsettings">
@@ -143,11 +159,14 @@
           <div class="checkbox">
             <label><input type="checkbox" id="showDate"> Show the date on screen</label>
           </div>
-          <div class="checkbox">
+          <div id="optBuses" class="checkbox" style="display:none">
             <label><input type="checkbox" id="enableBuses"> Include Bus services (National Rail)</label>
           </div>
-          <div class="checkbox">
+          <div id="optWeather" class="checkbox" style="display:none">
             <label><input type="checkbox" id="enableWeather"> Include current weather at station (National Rail)</label>
+          </div>
+          <div id="optFastRefresh" class="checkbox" style="display:none">
+            <label><input type="checkbox" id="enableFastRefresh"> Increase API refresh rate (National Rail)</label>
           </div>
           <div class="checkbox">
             <label><input type="checkbox" id="enableFirmware"> Enable automatic firmware updates at startup</label>
@@ -156,7 +175,6 @@
             <label><input type="checkbox" id="enableSleep"> Enable overnight sleep mode (screensaver)</label>
           </div>
         </div>
-
         <div class="form-group" id="sleepTimeSelectors">
           <div style="display: flex; gap: 10px;">
             <div style="flex: 1;">
@@ -467,6 +485,9 @@
       show("nrCallingBox",!enableTube);
       show("nrAtt",!enableTube);
       show("nrAltStation",!enableTube);
+      show("optBuses",!enableTube);
+      show("optWeather",!enableTube);
+      show("optFastRefresh",!enableTube);
       if ((enableTube && appState.tubeName) || (!enableTube && appState.stationName)) {
         elements.saveButton.removeAttribute("disabled");
        } else {
@@ -508,6 +529,7 @@
       setCheckbox("enableBuses", s.showBus);
       setCheckbox("enableFirmware", s.update);
       setCheckbox("enableWeather", s.weather);
+      setCheckbox("enableFastRefresh", s.fastRefresh);
 
       $('#sleepStart').val(s.sleepStarts);
       $('#sleepEnd').val(s.sleepEnds);
@@ -541,6 +563,7 @@
       appState.callingStationSelected = true;
       appState.callingStation = item.name;
       appState.callingCrs = item.crsCode;
+      handleClearAltStation();
     }
 
     function handleAltStationSelected(item) {
@@ -549,6 +572,7 @@
       appState.altCrs = item.crsCode;
       appState.altLatitude = item.latitude;
       appState.altLongitude = item.longitude;
+      handleClearFilter();
       toggleAltSelectors();
     }
 
@@ -635,6 +659,7 @@
       s.showBus = isChecked("enableBuses");
       s.update = isChecked("enableFirmware");
       s.weather = isChecked("enableWeather");
+      s.fastRefresh = isChecked("enableFastRefresh");
       s.sleepStarts = parseInt(elements.sleepStart.value);
       s.sleepEnds = parseInt(elements.sleepEnd.value);
       s.altCrs = appState.altCrs;
