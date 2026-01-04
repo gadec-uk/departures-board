@@ -1,7 +1,7 @@
 /*
  * Departures Board (c) 2025-2026 Gadec Software
  *
- * TfL London Underground Client Library
+ * bustimes.org Client Library
  *
  * https://github.com/gadec-uk/departures-board
  *
@@ -13,44 +13,52 @@
 #include <JsonStreamingParser.h>
 #include <stationData.h>
 
-typedef void (*tflClientCallback) ();
+typedef void (*busClientCallback) ();
 
-#define MAXLINESIZE 20
-#define UGMAXREADSERVICES 20
+#define MAXBUSLINESIZE 9
+#define BUSMAXREADSERVICES 20
 
-class TfLdataClient: public JsonListener {
+#define PBT_START 0
+#define PBT_HEADER 1
+#define PBT_SERVICE 2
+#define PBT_DESTINATION 3
+#define PBT_SCHEDULED 4
+#define PBT_EXPECTED 5
+
+class busDataClient: public JsonListener {
 
     private:
 
-        struct ugService {
+        struct busService {
             char destinationName[MAXLOCATIONSIZE];
-            char lineName[MAXLINESIZE];
-            int timeToStation;
+            char lineName[MAXBUSLINESIZE];
+            char scheduled[6];
+            char expected[6];
         };
 
-        struct ugStation {
+        struct busStop {
             int numServices;
-            ugService service[UGMAXREADSERVICES];
+            busService service[BUSMAXREADSERVICES];
         };
 
-        const char* apiHost = "api.tfl.gov.uk";
+        const char* apiHost = "bustimes.org";
         String currentKey = "";
         String currentObject = "";
 
         int id=0;
+        String longName;
         bool maxServicesRead = false;
-        ugStation xStation;
-        stnMessages xMessages;
+        busStop xBusStop;
 
-        bool pruneFromPhrase(char* input, const char* target);
+        String stripTag(String html);
         void replaceWord(char* input, const char* target, const char* replacement);
-        static bool compareTimes(const ugService& a, const ugService& b);
 
     public:
         String lastErrorMsg = "";
 
-        TfLdataClient();
-        int updateArrivals(rdStation *station, stnMessages *messages, const char *locationId, String apiKey, tflClientCallback Xcb);
+        busDataClient();
+        int getStopLongName(const char *locationId, char *locationName);
+        int updateDepartures(rdStation *station, const char *locationId, busClientCallback Xcb);
 
         virtual void whitespace(char c);
         virtual void startDocument();

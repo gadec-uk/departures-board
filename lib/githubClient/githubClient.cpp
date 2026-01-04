@@ -1,5 +1,5 @@
 /*
- * Departures Board (c) 2025 Gadec Software
+ * Departures Board (c) 2025-2026 Gadec Software
  *
  * GitHub Client Library - enables checking for latest release and downloading assets to file system
  *

@@ -1,5 +1,5 @@
 /*
- * Departures Board (c) 2025 Gadec Software
+ * Departures Board (c) 2025-2026 Gadec Software
  *
  * https://github.com/gadec-uk/departures-board
  *
@@ -20,7 +20,7 @@
 
 // Release version number
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 7
+#define VERSION_MINOR 8
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -37,10 +37,12 @@
 #include <stationData.h>
 #include <raildataXmlClient.h>
 #include <TfLdataClient.h>
+#include <busDataClient.h>
 #include <githubClient.h>
 #include <webgui/webgraphics.h>
 #include <webgui/index.h>
 #include <webgui/keys.h>
+#include <gfx/xbmgfx.h>
 
 #include <time.h>
 
@@ -66,7 +68,7 @@ static struct tm timeinfo;
 // Local firmware updates via /update Web GUI
 static const char updatePage[] PROGMEM =
 "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
-"<html><body><p>Firmware Upgrade - upload a <b>firmware.bin</b></p>"
+"<html><body><h2>Departures Board Manual Update</h2><p>Upload a <b>firmware.bin</b> file.</p>"
 "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
    "<input type='file' name='update'>"
         "<input type='submit' value='Update'>"
@@ -171,40 +173,41 @@ static const uint8_t NatRailSmall9[985] U8G2_FONT_SECTION("NatRailSmall9") =
   "}\6\15\253\305 ~\15>\345\315\220\204\306\341!\211\22\0\15=\245E\222U\212Q\22%J\1"
   "\200\11$k\215\22I\211\2\201\14\265%^\62hQ\66(\31\0\0\0\0";
 
-static const uint8_t NatRailTall12[1035] U8G2_FONT_SECTION("NatRailTall12") =
-  "`\0\3\2\3\4\2\5\5\7\14\0\375\11\375\11\0\1K\2\225\3\362 \5\0s\5!\7I\241"
-  "\304!\11\42\7\23/E\242\4#\21M\241M)I\6\245\224DI\62(\245$\1$\17M\241U"
-  "\266\224\222lK\242$\331\42\0%\12M\241\345\64e\235\216\0&\20M\241\215T\211\222(\222\222D"
-  "J\242H\11'\6\21\257\204\0(\10K!UR\352V)\11K!EV\352R\2*\13=\243U"
-  "\245\262X\226\246\10+\12-\245U\30\15R\30\1,\7\32\335L\242\0-\6\13)\305\0.\6\21"
-  "\241\204\0/\11M\241e[\307\42\0\60\12M\241\315\222\371-Y\0\61\10\313\241M\42\365e\62\13"
-  "M\241\315\222\205\265\216\203\0\63\14M\241\315\222\205%\65\324\222\5\64\16M\241]&%\245$J\6"
-  "-\254\0\65\14M\241\305\61\34\322\60\324\222\5\66\15M\241\315\222\211\341\220d\266d\1\67\14M\241"
-  "\305 \326\302,\314\302\14\70\15M\241\315\222\331\222%\263%\13\0\71\15M\241\315\222\331\222!\14\265"
-  "d\1:\6)\245\204\42;\10\62\343L-Q\0<\10<c]\324\330\0=\10\34g\305\20\16\1"
-  ">\10<cE\330\324\6?\14M\241\315\222\205\265b\16E\0@\16M\241\315\222Y\22%Q\206\60"
-  "]\0A\13M\241\315\222\331\206!s\13B\15M\241\305\220d\266A\311l\203\2C\13M\241\315\222"
-  "\211\275%\13\0D\13M\241\305\220d~\33\24\0E\13M\241\305\261\70$aq\20F\13M\241\305"
-  "\261\70$a#\0G\14M\241\315\222\211\245\315\226,\0H\13M\241E\346\66\14\231[\0I\6I"
-  "\241\304\3J\11M\241e\37\265d\1K\16M\241E\230III\323\222\250\222\5L\11M\241E\330"
-  "\217\203\0M\14M\241E\266,\211\222h\336\2N\15M\241E\66MJ\242$\322M\13O\12M\241"
-  "\315\222\371-Y\0P\14M\241\305\220d\266A\11\33\1Q\13]\235\315\222\371-\31\323\0R\15M"
-  "\241\305\220d\266A)U\62-S\14M\241\315\222\251jQK\26\0T\11M\241\305 \205\375\4U"
-  "\11M\241E\346o\311\2V\12M\241E\346\267\244\26\1W\13M\241E\346K\242$\267\0X\16M"
-  "\241E\246%\245$\253DIM\13Y\14M\241E\246%\245$\13;\1Z\13M\241\305 \326:\206"
-  "\203\0[\10J\341\304\322\27\1\134\10M\241EX\355X]\10J\341\204\322\227\1^\6\23/M\3"
-  "_\6\15\237\305 `\6\22\357D\24a\13\65\241\315\232\14\232\226\14\1b\14M\241E\330b\322\264"
-  "IQ\0c\11\65\241\315 \266\16\1d\13M\241e\213i\63)J\0e\14\65\241\315\222\15C\230"
-  "%\13\0f\13La\225\222EC\222u\2g\15M\233\215i\63)J\250%\13\0h\12M\241E"
-  "\330b\322\334\2i\7A\241D\62\14j\13\134[]\16d\275I\211\2k\15M\241E\330\224\224\264"
-  "$\252d\1l\6I\241\304\3m\15\65\241\205\322\242$J\242$J\1n\11\65\241Eb\322\334\2"
-  "o\12\65\241\315\222\271%\13\0p\15M\233Eb\322\264IQ\302\42\0q\13M\233\215i\63)J"
-  "\330\0r\11\65\241Eb\22\33\1s\12\65\241\315\222\256Z\262\0t\12DaM\26\15I\326(u"
-  "\11\65\241E\346IQ\2v\14\65\241E\246%\245$\13#\0w\15\65\241E\222(\211\222(\211\322"
-  "\5x\13\65\241E\226\324\302,\251\5y\14M\233E\346IQB-Y\0z\12\65\241\305 fm"
-  "\203\0{\21O!N\226h\313\322SdQ\223,I\226\0|\6I\241\305\3}\17^\233]\234\14"
-  "c\35\13\303a\211\63\0~\21N\341\315\220\14C(\16\17\212\62\14I\224\0\16N\341E\22f"
-  "J\224fI\226\364\37\0\0\0";
+static uint8_t NatRailTall12[1064] U8G2_FONT_SECTION("NatRailTall12") =
+  "a\0\3\2\4\4\2\5\5\11\14\0\375\11\375\11\0\1Q\2\235\4\17 \5\0\346\12!\7\221B"
+  "\211C\22\42\7#^\212D\11#\21\225B\233R\222\14J)\211\222dPJI\2$\17\225B\253"
+  "l)%\331\226DI\262E\0%\12\225B\313i\312:\35\1&\20\225B\33\251\22%Q$%\211"
+  "\224D\221\22'\6!^\11\1(\11\223B\252\244\324\255\0)\11\223B\212\254\324\245\4*\14uF"
+  "\253Je\261,M\21\0+\12UJ\253\60\32\244\60\2,\7\62\272\231D\1-\6\23R\212\1."
+  "\6!B\11\1/\11\225B\313\266\216E\0\60\12\225B\233%\363[\262\0\61\11\223C\233D\352\313"
+  "\0\62\13\225B\233%\13k\35\7\1\63\15\225B\233%\13Kj\250%\13\0\64\16\225B\273LJ"
+  "JI\224\14ZX\1\65\15\225B\213c\70\244a\250%\13\0\66\15\225B\233%\23\303!\311l\311"
+  "\2\67\15\225B\213A\254\205Y\230\205\31\0\70\15\225B\233%\263%KfK\26\0\71\15\225B\233"
+  "%\263%C\30j\311\2:\6QJ\11E;\10b\306\231Z\242\0<\10t\306\272\250\261\1=\10"
+  "\64\316\212!\34\2>\10t\306\212\260\251\15?\14\225B\233%\13k\305\34\212\0@\16\225B\233%"
+  "\263$J\242\14a\272\0A\13\225B\233%\263\15C\346\26B\15\225B\213!\311l\203\222\331\6\5"
+  "C\13\225B\233%\23{K\26\0D\13\225B\213!\311\374\66(\0E\13\225B\213cqH\302\342"
+  " F\13\225B\213cqH\302F\0G\14\225B\233%\23K\233-Y\0H\13\225B\213\314m\30"
+  "\62\267\0I\6\221B\211\7J\11\225B\313>j\311\2K\16\225B\213\60\223\222\222\246%Q%\13"
+  "L\11\225B\213\260\37\7\1M\14\225B\213lY\22%\321\274\5N\15\225B\213l\232\224DI\244"
+  "\233\26O\12\225B\233%\363[\262\0P\14\225B\213!\311l\203\22\66\2Q\13\265:\233%\363["
+  "\62\246\1R\16\225B\213!\311l\203R\252dZ\0S\14\225B\233%S\325\242\226,\0T\11\225"
+  "B\213A\12\373\11U\11\225B\213\314\337\222\5V\12\225B\213\314oI-\2W\13\225B\213\314\227"
+  "DIn\1X\16\225B\213LKJIV\211\222\232\26Y\14\225B\213LKJI\26v\2Z\13"
+  "\225B\213A\254u\14\7\1[\10\222\302\211\245/\2\134\11\225B\213\260\332\261\0]\10\222\302\11\245"
+  "/\3^\6#^\232\6_\6\25>\213A`\6\42\336\211(a\13eB\233\65\31\64-\31\2b"
+  "\14\225B\213\260\305\244i\223\242\0c\11eB\233Al\35\2d\13\225B\313\26\323fR\224\0e"
+  "\14eB\233%\33\206\60K\26\0f\13\224\302*%\213\206$\353\4g\15\225\66\33\323fR\224P"
+  "K\26\0h\12\225B\213\260\305\244\271\5i\7\201B\211d\30j\13\264\266\272\34\310z\223\22\5k"
+  "\15\225B\213\260))iIT\311\2l\6\221B\211\7m\15eB\13\245EI\224DI\224\2n"
+  "\11eB\213\304\244\271\5o\12eB\233%sK\26\0p\15\225\66\213\304\244i\223\242\204E\0q"
+  "\13\225\66\33\323fR\224\260\1r\11eB\213\304$\66\2s\12eB\233%]\265d\1t\12\204"
+  "\302\232,\32\222\254Qu\11eB\213\314\223\242\4v\14eB\213LKJI\26F\0w\16eB"
+  "\213$Q\22%Q\22\245\13\0x\13eB\213,\251\205YR\13y\14\225\66\213\314\223\242\204Z\262"
+  "\0z\12eB\213A\314\332\6\1{\21\227B\234,\321\226\245\247\310\242&Y\222,\1|\6\221B"
+  "\213\7}\17\266\66\273\70\31\306:\26\206\303\22g\0~\21\226\302\233!\31\206P\34\36\24e\30\222"
+  "(\1\16\226\302\213$\314\224(\315\222,\351?\200\24\231B\255AK\223L\222B)\224BMJ"
+  "\322l\220\0\0\0\0";
 
 static const uint8_t NatRailClockSmall7[137] U8G2_FONT_SECTION("NatRailClockSmall7") =
   "\12\0\3\3\3\3\3\1\5\7\7\0\0\7\0\7\0\0\0\0\0\0p\60\12?\343Td\274I*"
@@ -264,6 +267,11 @@ static const uint8_t UndergroundClock8[150] U8G2_FONT_SECTION("UndergroundClock8
 "\251\310\250\26\31\233\244\2\67\12G\305\70\310\204z\225\2\70\15G\305\251\310h\222\212\214MR\1\71"
 "\15G\305\251\310h\22+\215&\251\0:\6\262\257 \22\0\0\0";
 
+// Service attribution texts
+const char nrAttributionn[] = "Powered by National Rail Enquiries";
+const char tflAttribution[] = "Powered by TfL Open Data";
+const char btAttribution[] = "Powered by bustimes.org";
+
 //
 // GitHub Client for firmware updates
 //  - Pass a GitHub token if updates are to be loaded from a private repository
@@ -274,6 +282,7 @@ github ghUpdate("");
 #define DATAUPDATEINTERVAL 150000     // How often we fetch data from National Rail (ms - 2.5 mins) - "default" option
 #define FASTDATAUPDATEINTERVAL 45000  // How often we fetch data from National Rail (ms - 45 secs) - "fast" option
 #define UGDATAUPDATEINTERVAL 30000    // How often we fetch data from TfL (ms - 30 secs)
+#define BUSDATAUPDATEINTERVAL 45000   // How often we fetch data from bustimes.org (ms - 45 secs)
 
 // Bit and bobs
 unsigned long timer = 0;
@@ -321,7 +330,19 @@ float altLon=0;
 String tflAppkey = "";              // TfL API Key
 char tubeId[13] = "";               // Underground station naptan id
 String tubeName="";                 // Underground Station Name
-bool tubeMode = false;              // Mode for the board - National Rail or London Underground
+char busAtco[13]="";                // Bus Stop ATCO location
+String busName="";                  // Bus Stop long name
+int busDestX;                       // Variable margin for bus destination
+float busLat=0;                     // Bus stop Latitude/Longitude (used to get weather for the location)
+float busLon=0;
+
+// board has three possible modes.
+enum boardModes {
+  MODE_RAIL = 0,
+  MODE_TUBE = 1,
+  MODE_BUS = 2
+};
+boardModes boardMode = MODE_RAIL;
 
 // Coach class availability
 static const char firstClassSeating[] PROGMEM = " First class seating only.";
@@ -348,10 +369,10 @@ bool isShowingVia=false;
 unsigned long serviceTimer=0;
 unsigned long viaTimer=0;
 bool showingMessage = false;
-// TfL specific animation
+// TfL/bus specific animation
 int scrollPrimaryYpos = 0;
 bool isScrollingPrimary = false;
-bool tflAttribution = false;
+bool attributionScrolled = false;
 
 char displayedTime[29] = "";        // The currently displayed time
 unsigned long nextClockUpdate = 0;  // Next time we need to check/update the clock display
@@ -379,6 +400,8 @@ char wsdlAPI[MAXAPIURLSIZE];                    // wsdl API url
 raildataXmlClient* raildata = nullptr;
 // TfL Client
 TfLdataClient* tfldata = nullptr;
+// Bus Client
+busDataClient* busdata = nullptr;
 // Station Data (shared)
 rdStation station;
 // Station Messages (shared)
@@ -486,6 +509,47 @@ void drawStartupHeading() {
   drawBuildTime();
 }
 
+void drawStationHeader(const char *stopName, const char *callingStopName) {
+
+  // Clear the top line
+  if (boardMode == MODE_TUBE || boardMode == MODE_BUS) {
+    blankArea(0,ULINE0,256,ULINE1-1);
+  } else {
+    blankArea(0,LINE0,256,LINE1-1);
+  }
+
+  u8g2.setFont(NatRailSmall9);
+  char boardTitle[95];
+  if (callingStopName[0]) snprintf(boardTitle,sizeof(boardTitle),"%s  (%c%s)",stopName,129,callingStopName);
+  else strncpy(boardTitle,stopName,sizeof(boardTitle));
+  int boardTitleWidth = getStringWidth(boardTitle);
+  int line4Y = (boardMode == MODE_RAIL) ? LINE4 : ULINE4;
+
+  if (dateEnabled) {
+    // Get the date
+    char sysTime[29];
+    getLocalTime(&timeinfo);
+    strftime(sysTime,29,"%a %d %b",&timeinfo);
+    dateWidth = getStringWidth(sysTime);
+    dateDay = timeinfo.tm_mday;
+    if (callingStopName[0] || boardTitleWidth+dateWidth+10>=SCREEN_WIDTH) {
+      blankArea(SCREEN_WIDTH-70,line4Y,70,SCREEN_HEIGHT-line4Y);
+      u8g2.drawStr(SCREEN_WIDTH-dateWidth,line4Y-1,sysTime); // Date bottom right
+      centreText(boardTitle,LINE0-1);
+    } else {
+      u8g2.drawStr(SCREEN_WIDTH-dateWidth,ULINE0-1,sysTime); // right-aligned date top
+      if ((SCREEN_WIDTH-boardTitleWidth)/2 < dateWidth+8) {
+        // station name left aligned
+        u8g2.drawStr(0,ULINE0-1,boardTitle);
+      } else {
+        centreText(boardTitle,ULINE0-1);
+      }
+    }
+  } else {
+    centreText(boardTitle,ULINE0-1);
+  }
+}
+
 // Draw the NR clock (if the time has changed)
 void drawCurrentTime(bool update) {
   char sysTime[29];
@@ -504,17 +568,7 @@ void drawCurrentTime(bool update) {
     strcpy(displayedTime,sysTime);
     if (dateEnabled && timeinfo.tm_mday!=dateDay) {
       // Need to update the date on screen
-      strftime(sysTime,29,"%a %d %b",&timeinfo);
-      int newDateWidth = getStringWidth(sysTime);
-      if (callingStation[0]) {
-        blankArea(SCREEN_WIDTH-dateWidth,LINE4-1,dateWidth,9);
-        u8g2.drawStr(SCREEN_WIDTH-newDateWidth,LINE4-1,sysTime);
-      } else {
-        blankArea(SCREEN_WIDTH-dateWidth,LINE0-1,dateWidth,9);
-        u8g2.drawStr(SCREEN_WIDTH-newDateWidth,LINE0-1,sysTime);
-      }
-      dateWidth = newDateWidth;
-      dateDay = timeinfo.tm_mday;
+      drawStationHeader(station.location,callingStation);
       if (update) u8g2.sendBuffer();  // Just refresh on new date
     }
   }
@@ -571,7 +625,7 @@ void showNoDataScreen() {
   u8g2.clearBuffer();
   char msg[60];
   u8g2.setFont(NatRailTall12);
-  if (tubeMode) strcpy(msg,"No data available for the selected station.");
+  if (boardMode!=MODE_RAIL) strcpy(msg,"No data available for the selected station.");
   else sprintf(msg,"No data available for station code \"%s\".",crsCode);
   centreText(msg,-1);
   u8g2.setFont(NatRailSmall9);
@@ -622,11 +676,17 @@ void showTokenErrorScreen() {
   char msg[60];
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
-  if (tubeMode) {
-    centreText(F("Access to the TfL database denied."),-1);
-  } else {
-    centreText(F("Access to the National Rail database denied."),-1);
-    strcpy(nrToken,"");
+  switch (boardMode) {
+    case MODE_RAIL:
+      centreText(F("Access to the National Rail database denied."),-1);
+      strcpy(nrToken,"");
+      break;
+    case MODE_TUBE:
+      centreText(F("Access to the TfL database denied."),-1);
+      break;
+    case MODE_BUS:
+      centreText(F("Access to the bustimes database denied."),-1);
+      break;
   }
   u8g2.setFont(NatRailSmall9);
   centreText(F("You must enter a valid auth token, please"),14);
@@ -640,8 +700,17 @@ void showCRSErrorScreen() {
   u8g2.clearBuffer();
   char msg[60];
   u8g2.setFont(NatRailTall12);
-  if (tubeMode) strcpy(msg,"The Underground station is not valid");
-  else sprintf(msg,"The station code \"%s\" is not valid.",crsCode);
+  switch (boardMode) {
+    case MODE_RAIL:
+      sprintf(msg,"The station code \"%s\" is not valid.",crsCode);
+      break;
+    case MODE_TUBE:
+      strcpy(msg,"The Underground station is not valid");
+      break;
+    case MODE_BUS:
+      sprintf(msg,"The atco code \"%s\" is not valid.",busAtco);
+      break;
+  }
   centreText(msg,-1);
   u8g2.setFont(NatRailSmall9);
   centreText(F("Please ensure you have selected a valid station."),14);
@@ -801,8 +870,8 @@ void loadApiKeys() {
 }
 
 // Write a default config file so that the Web GUI works initially (force Tube mode if no NR token)
-void writeDefaultConfig() {    
-    String defaultConfig = "{\"crs\":\"\",\"station\":\"\",\"lat\":0,\"lon\":0,\"weather\":" + String((openWeatherMapApiKey.length())?"true":"false") + F(",\"sleep\":false,\"showDate\":false,\"showBus\":false,\"update\":true,\"sleepStarts\":23,\"sleepEnds\":8,\"brightness\":20,\"tubeId\":\"\",\"tubeName\":\"\",\"tube\":") + String((!nrToken[0])?"true":"false") + "}";
+void writeDefaultConfig() {
+    String defaultConfig = "{\"crs\":\"\",\"station\":\"\",\"lat\":0,\"lon\":0,\"weather\":" + String((openWeatherMapApiKey.length())?"true":"false") + F(",\"sleep\":false,\"showDate\":false,\"showBus\":false,\"update\":true,\"sleepStarts\":23,\"sleepEnds\":8,\"brightness\":20,\"tubeId\":\"\",\"tubeName\":\"\",\"mode\":") + String((!nrToken[0])?"1":"0") + "}";
     saveFile(F("/config.json"),defaultConfig);
     strcpy(crsCode,"");
     strcpy(tubeId,"");
@@ -838,7 +907,8 @@ void loadConfig() {
         if (settings[F("lat")].is<float>())              stationLat = settings[F("lat")];
         if (settings[F("lon")].is<float>())              stationLon = settings[F("lon")];
 
-        if (settings[F("tube")].is<bool>())              tubeMode = settings[F("tube")];
+        if (settings[F("mode")].is<int>())               boardMode = settings[F("mode")];
+        else if (settings[F("tube")].is<bool>())         boardMode = settings[F("tube")] ? MODE_TUBE : MODE_RAIL; // handle legacy v1.x config
         if (settings[F("tubeId")].is<const char*>())     strlcpy(tubeId, settings[F("tubeId")], sizeof(tubeId));
         if (settings[F("tubeName")].is<const char*>())   tubeName = settings[F("tubeName")].as<String>();
 
@@ -853,6 +923,11 @@ void loadConfig() {
         if (settings[F("altEnds")].is<int>())            altEnds = settings[F("altEnds")];
         if (settings[F("altLat")].is<float>())           altLat = settings[F("altLat")];
         if (settings[F("altLon")].is<float>())           altLon = settings[F("altLon")];
+
+        if (settings[F("busId")].is<const char*>())      strlcpy(busAtco, settings[F("busId")], sizeof(busAtco));
+        if (settings[F("busName")].is<const char*>())    busName = String(settings[F("busName")]);
+        if (settings[F("busLat")].is<float>())           busLat = settings[F("busLat")];
+        if (settings[F("busLon")].is<float>())           busLon = settings[F("busLon")];
       } else {
         // JSON deserialization failed - TODO
       }
@@ -863,7 +938,7 @@ void loadConfig() {
 
 // Switch to the alternate station settings if appropriate
 bool setAlternateStation() {
-  if (!tubeMode && altStationEnabled && isAltActive()) {
+  if (boardMode==MODE_RAIL && altStationEnabled && isAltActive()) {
     // Switch to alternate station
     strcpy(crsCode,altCrsCode);
     stationLat = altLat;
@@ -876,7 +951,7 @@ bool setAlternateStation() {
 
 // Soft reset/reload
 void softResetBoard() {
-  bool previousMode = tubeMode;
+  int previousMode = boardMode;
 
   // Reload the settings
   loadConfig();
@@ -903,29 +978,66 @@ void softResetBoard() {
   line3Service=0;
   prevService=0;
   if (!weatherEnabled) strcpy(weatherMsg,"");
-  if (previousMode!=tubeMode) {
+  if (previousMode!=boardMode) {
     // Board mode has changed!
-    if (previousMode) {
-      // Delete the tfl client from memory
-      delete tfldata;
-      tfldata = nullptr;
-      // Create the NR client
-      raildata = new raildataXmlClient();
-      int res = raildata->init(wsdlHost, wsdlAPI, &raildataCallback);
-      if (res != UPD_SUCCESS) {
-        showWsdlFailureScreen();
-        while (true) { server.handleClient(); yield();}
-      }
-    } else {
-      // Delete the NR client from memory
-      delete raildata;
-      raildata = nullptr;
-      // Create the TfL client
-      tfldata = new TfLdataClient();
+    switch (previousMode) {
+      case MODE_RAIL:
+        // Delete the NR client from memory
+        delete raildata;
+        raildata = nullptr;
+        break;
+
+      case MODE_TUBE:
+        // Delete the tfl client from memory
+        delete tfldata;
+        tfldata = nullptr;
+        break;
+
+      case MODE_BUS:
+        // Delete the Bus client from memory
+        delete busdata;
+        busdata = nullptr;
+        break;
+    }
+
+    switch (boardMode) {
+      case MODE_RAIL:
+        // Create the NR client
+        raildata = new raildataXmlClient();
+        if (boardMode == MODE_RAIL) {
+          int res = raildata->init(wsdlHost, wsdlAPI, &raildataCallback);
+          if (res != UPD_SUCCESS) {
+            showWsdlFailureScreen();
+             while (true) { server.handleClient(); yield();}
+          }
+        }
+        break;
+
+      case MODE_TUBE:
+        // Create the TfL client
+        tfldata = new TfLdataClient();
+        break;
+
+      case MODE_BUS:
+        // Create the Bus client
+        busdata = new busDataClient();
+        break;
     }
   }
-  if (tubeMode) progressBar(F("Initialising TfL interface"),70);
-  else altStationActive = setAlternateStation();
+
+  switch (boardMode) {
+    case MODE_RAIL:
+      altStationActive = setAlternateStation();
+      break;
+
+    case MODE_TUBE:
+      progressBar(F("Initialising TfL interface"),70);
+      break;
+
+    case MODE_BUS:
+      progressBar(F("Initialising BusTimes interface"),70);
+      break;
+  }
   station.numServices=0;
   messages.numMessages=0;
 }
@@ -1149,7 +1261,7 @@ void drawServiceLine(int line, int y) {
       centreText(weatherMsg,y-1);
     } else {
       // We're showing the mandatory attribution
-      centreText(F("Powered by National Rail Enquiries"),y-1);
+      centreText(nrAttributionn,y-1);
     }
   }
 }
@@ -1166,33 +1278,7 @@ void drawStationBoard() {
     // Clear the top two lines
     blankArea(0,LINE0,256,LINE2-1);
   }
-  u8g2.setFont(NatRailSmall9);
-  char boardTitle[95];
-  if (callingStation[0]) snprintf(boardTitle,sizeof(boardTitle),"%s  (%c%s)",station.location,129,callingStation);
-  else strncpy(boardTitle,station.location,sizeof(boardTitle));
-
-  if (dateEnabled) {
-    // Get the date
-    char sysTime[29];
-    getLocalTime(&timeinfo);
-    strftime(sysTime,29,"%a %d %b",&timeinfo);
-    dateWidth = getStringWidth(sysTime);
-    dateDay = timeinfo.tm_mday;
-    if (callingStation[0]) {
-      u8g2.drawStr(SCREEN_WIDTH-dateWidth,LINE4-1,sysTime); // Date bottom right when filtering services
-      centreText(boardTitle,LINE0-1);
-    } else {
-      u8g2.drawStr(SCREEN_WIDTH-dateWidth,LINE0-1,sysTime); // right-aligned date top
-      if ((SCREEN_WIDTH-getStringWidth(boardTitle))/2 < dateWidth+8) {
-        // Station name left aligned
-        u8g2.drawStr(0,LINE0-1,boardTitle);
-      } else {
-        centreText(boardTitle,LINE0-1);
-      }
-    }
-  } else {
-    centreText(boardTitle,LINE0-1);
-  }
+  drawStationHeader(station.location,callingStation);
 
   // Draw the primary service line
   isShowingVia=false;
@@ -1317,24 +1403,21 @@ void drawCurrentTimeUG(bool update) {
     u8g2.setFont(Underground10);
 
     if (dateEnabled && timeinfo.tm_mday!=dateDay) {
-      // Need to update the date on screen
-      strftime(sysTime,29,"%a %d %b",&timeinfo);
-      int newDateWidth = getStringWidth(sysTime);
-      blankArea(SCREEN_WIDTH-dateWidth,ULINE0,dateWidth,10);
-      u8g2.drawStr(SCREEN_WIDTH-newDateWidth,ULINE0-1,sysTime);
-      dateWidth = newDateWidth;
-      dateDay = timeinfo.tm_mday;
+      if (boardMode == MODE_TUBE) drawStationHeader(tubeName.c_str(),"");
+      else drawStationHeader(busName.c_str(),"");
       if (update) u8g2.sendBuffer();  // Just refresh on new date
+      u8g2.setFont(Underground10);
     }
   }
 }
 
-// Callback from the TfLdataClient library when processing data. Shows progress at startup and keeps clock running
+// Callback from the TfLdataClient/busDataClient library when processing data. Shows progress at startup and keeps clock running
 void tflCallback() {
   if (firstLoad) {
     if (startupProgressPercent<95) {
       startupProgressPercent+=5;
-      progressBar(F("Initialising TfL interface"),startupProgressPercent);
+      if (boardMode == MODE_TUBE) progressBar(F("Initialising TfL interface"),startupProgressPercent);
+      else progressBar(F("Initialising BusTimes interface"),startupProgressPercent);
     }
   } else if (millis()>nextClockUpdate) {
     nextClockUpdate = millis()+500;
@@ -1393,7 +1476,7 @@ void drawUndergroundService(int serviceId, int y) {
 void drawUndergroundBoard() {
   numMessages = messages.numMessages;
   if (line3Service==0) line3Service=1;
-  tflAttribution=false;
+  attributionScrolled=false;
   if (firstLoad) {
     // Clear the entire screen for the first load since boot up/wake from sleep
     u8g2.clearBuffer();
@@ -1403,25 +1486,7 @@ void drawUndergroundBoard() {
       // Clear the top three lines
       blankArea(0,ULINE0,256,ULINE3-1);
   }
-  //u8g2.setFont(Underground10);
-  u8g2.setFont(NatRailSmall9);
-  if (dateEnabled) {
-    // Get the date
-    char sysTime[29];
-    getLocalTime(&timeinfo);
-    strftime(sysTime,29,"%a %d %b",&timeinfo);
-    dateWidth = getStringWidth(sysTime);
-    dateDay = timeinfo.tm_mday;
-    u8g2.drawStr(SCREEN_WIDTH-dateWidth,ULINE0-1,sysTime); // right-aligned date top
-    if ((SCREEN_WIDTH-getStringWidth(tubeName.c_str()))/2 < dateWidth+8) {
-      // Station name left aligned
-      u8g2.drawStr(0,ULINE0-1,tubeName.c_str());
-    } else {
-      centreText(tubeName.c_str(),ULINE0-1);
-    }
-  } else {
-    centreText(tubeName.c_str(),ULINE0-1);
-  }
+  drawStationHeader(tubeName.c_str(),"");
 
   if (station.boardChanged) {
     // prepare to scroll up primary services
@@ -1430,6 +1495,7 @@ void drawUndergroundBoard() {
     // reset line3
     line3Service = 99;
     prevScrollStopsLength = 0;
+    currentMessage=99;
     blankArea(0,ULINE3,256,11);
     serviceTimer=0;
   } else {
@@ -1446,9 +1512,125 @@ void drawUndergroundBoard() {
     strcpy(line2[i],messages.messages[i]);
   }
   // Add attribution msg
-  strcpy(line2[messages.numMessages],"Powered by TfL Open Data");
+  strcpy(line2[messages.numMessages],tflAttribution);
   messages.numMessages++;
 
+  u8g2.sendBuffer();
+}
+
+/*
+ *
+ * Bus Departures Board
+ *
+ */
+bool getBusDeparturesBoard() {
+  if (!firstLoad) showUpdateIcon(true);
+  lastUpdateResult = busdata->updateDepartures(&station,busAtco,&tflCallback);
+  nextDataUpdate = millis()+BUSDATAUPDATEINTERVAL; // default update freq
+  if (lastUpdateResult == UPD_SUCCESS || lastUpdateResult == UPD_NO_CHANGE) {
+    showUpdateIcon(false);
+    lastDataLoadTime=millis();
+    noDataLoaded=false;
+    dataLoadSuccess++;
+    // Work out the max column size for service numbers
+    busDestX=0;
+    u8g2.setFont(NatRailSmall9);
+    for (int i=0;i<station.numServices;i++) {
+      int svcWidth = getStringWidth(station.service[i].via);
+      busDestX = (busDestX > svcWidth) ? busDestX : svcWidth;
+    }
+    busDestX+=5;
+    return true;
+  } else if (lastUpdateResult == UPD_DATA_ERROR || lastUpdateResult == UPD_TIMEOUT) {
+    lastLoadFailure=millis();
+    dataLoadFailure++;
+    nextDataUpdate = millis() + 30000; // 30 secs
+    showUpdateIcon(false);
+    return false;
+  } else if (lastUpdateResult == UPD_UNAUTHORISED) {
+    showTokenErrorScreen();
+    while (true) { server.handleClient(); yield();}
+  } else {
+    showUpdateIcon(false);
+    dataLoadFailure++;
+    return false;
+  }
+}
+
+void drawBusService(int serviceId, int y, int destPos) {
+  char clipDestination[MAXLOCATIONSIZE];
+  char etd[16];
+
+  if (serviceId < station.numServices) {
+    u8g2.setFont(NatRailSmall9);
+    blankArea(0,y,256,9);
+
+    u8g2.drawStr(0,y-1,station.service[serviceId].via);
+    int etdWidth = 25;
+    if (isDigit(station.service[serviceId].etd[0])) {
+      sprintf(etd,"Exp %s",station.service[serviceId].etd);
+      etdWidth = 47;
+    } else strcpy(etd,station.service[serviceId].sTime);
+    u8g2.drawStr(SCREEN_WIDTH - etdWidth,y-1,etd);
+
+    // work out if we need to clip the destination
+    strcpy(clipDestination,station.service[serviceId].destination);
+    int spaceAvailable = SCREEN_WIDTH - destPos - etdWidth - 6;
+    if (getStringWidth(clipDestination) > spaceAvailable) {
+      while (getStringWidth(clipDestination) > spaceAvailable - 17) {
+        clipDestination[strlen(clipDestination)-1] = '\0';
+      }
+      // check if there's a trailing space left
+      if (clipDestination[strlen(clipDestination)-1] == ' ') clipDestination[strlen(clipDestination)-1] = '\0';
+      strcat(clipDestination,"...");
+    }
+    u8g2.drawStr(destPos,y-1,clipDestination);
+  }
+}
+
+// Draw/update the Bus Departures Board
+void drawBusDeparturesBoard() {
+
+  if (line3Service==0) line3Service=1;
+  if (firstLoad) {
+    // Clear the entire screen for the first load since boot up/wake from sleep
+    u8g2.clearBuffer();
+    u8g2.setContrast(brightness);
+    firstLoad=false;
+  } else {
+      // Clear the top three lines
+      blankArea(0,ULINE0,256,ULINE3-1);
+  }
+  drawStationHeader(busName.c_str(),"");
+
+  if (station.boardChanged) {
+    // prepare to scroll up primary services
+    scrollPrimaryYpos = 11;
+    isScrollingPrimary = true;
+    // reset line3
+    if (station.numServices>2) {
+      line3Service=2;
+    } else {
+      line3Service=99;
+    }
+    currentMessage = -1;
+    blankArea(0,ULINE3,256,11);
+    serviceTimer=0;
+  } else {
+    // Draw the primary service line(s)
+    if (station.numServices) {
+      drawBusService(0,ULINE1,busDestX);
+      if (station.numServices>1) drawBusService(1,ULINE2,busDestX);
+    } else {
+      u8g2.setFont(NatRailSmall9);
+      centreText(F("There are no scheduled services at this stop."),ULINE1-1);
+    }
+  }
+  messages.numMessages=0;
+  if (weatherEnabled && weatherMsg[0]) {
+    strcpy(line2[messages.numMessages++],weatherMsg);
+  }
+  strcpy(line2[messages.numMessages++],btAttribution);
   u8g2.sendBuffer();
 }
 
@@ -1586,7 +1768,7 @@ void handleSaveKeys() {
       // If both the station codes are blank, we're in the setup process. If not, the keys have been changed so just reboot.
       if (!crsCode[0] && !tubeId[0]) {
         writeDefaultConfig();
-        showSetupCrsHelpScreen(); 
+        showSetupCrsHelpScreen();
       } else {
         delay(500);
         ESP.restart();
@@ -1606,18 +1788,18 @@ void handleSaveSettings() {
   if ((server.method() == HTTP_POST) && (server.hasArg("plain"))) {
     newJSON = server.arg("plain");
     saveFile(F("/config.json"),newJSON);
-    if (!crsCode[0]) {
+    if (!crsCode[0] && !tubeId[0]) {
       // First time setup, we need a full reboot
-      sendResponse(200,F("Configuration saved. The Departures Board will now restart."));
+      sendResponse(200,F("Configuration saved. The system will now restart."));
       delay(1000);
       ESP.restart();
     } else {
-      sendResponse(200,F("Configuration updated. The Departures Board will update shortly."));
+      sendResponse(200,F("Configuration updated. The system will update shortly."));
       softResetBoard();
     }
   } else {
     // Something went wrong saving the config file
-    sendResponse(400,F("The configuration could not be updated. The Departures Board will restart."));
+    sendResponse(400,F("The configuration could not be updated. The system will restart."));
     delay(1000);
     ESP.restart();
   }
@@ -1739,6 +1921,7 @@ void handleNotFound() {
   else if (server.uri() == F("/index.htm")) handleStreamFlashFile(server.uri(), indexhtm, sizeof(indexhtm));
   else if (server.uri() == F("/nrelogo.webp")) handleStreamFlashFile(server.uri(), nrelogo, sizeof(nrelogo));
   else if (server.uri() == F("/tfllogo.webp")) handleStreamFlashFile(server.uri(), tfllogo, sizeof(tfllogo));
+  else if (server.uri() == F("/btlogo.webp")) handleStreamFlashFile(server.uri(), btlogo, sizeof(btlogo));
   else if (server.uri() == F("/tube.webp")) handleStreamFlashFile(server.uri(), tubeicon, sizeof(tubeicon));
   else if (server.uri() == F("/nr.webp")) handleStreamFlashFile(server.uri(), nricon, sizeof(nricon));
   else if (server.uri() == F("/favicon.svg")) handleStreamFlashFile(server.uri(), favicon, sizeof(favicon));
@@ -1765,15 +1948,23 @@ void handleInfo() {
   message+="\nCRS station code: " + String(crsCode) + F("\nNaptan station code: ") + String(tubeId) + F("\nSuccessful: ") + String(dataLoadSuccess) + F("\nFailures: ") + String(dataLoadFailure) + F("\nTime since last data load: ") + String((int)((millis()-lastDataLoadTime)/1000)) + F(" seconds");
   if (dataLoadFailure) message+="\nTime since last failure: " + String((int)((millis()-lastLoadFailure)/1000)) + F(" seconds");
   message+=F("\nLast Result: ");
-  if (!tubeMode) {
-    message+=raildata->getLastError();
-  } else {
-    message+=tfldata->lastErrorMsg;
+  switch (boardMode) {
+    case MODE_RAIL:
+      message+=raildata->getLastError();
+      break;
+
+    case MODE_TUBE:
+      message+=tfldata->lastErrorMsg;
+      break;
+
+    case MODE_BUS:
+      message+=busdata->lastErrorMsg;
+      break;
   }
   message+="\nServices: " + String(station.numServices) + F("\nMessages: ");
-  if (tubeMode) message+=String(messages.numMessages-1); else message+=String(messages.numMessages);
+  if (boardMode == MODE_TUBE) message+=String(messages.numMessages-1); else message+=String(messages.numMessages);
   message+=F("\n");
-  for (int i=0;i<messages.numMessages;i++) message+=String(messages.messages[i]) + "\n";
+  if (boardMode != MODE_BUS) for (int i=0;i<messages.numMessages;i++) message+=String(messages.messages[i]) + "\n";
   message+=F("\nUpdate result code: ");
   switch (lastUpdateResult) {
     case UPD_SUCCESS:
@@ -1867,7 +2058,7 @@ void handleBrightness() {
 
 // Web GUI has requested updates be installed
 void handleOtaUpdate() {
-  sendResponse(200,F("Update initiated - check Departure Board for progress"));
+  sendResponse(200,F("Update initiated - check Departure Board display for progress"));
   delay(500);
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
@@ -1988,11 +2179,11 @@ void handleStationPicker() {
 }
 
 // Update the current weather message if weather updates are enabled and we have a lat/lon for the selected location
-void updateCurrentWeather() {
+void updateCurrentWeather(float latitude, float longitude) {
   nextWeatherUpdate = millis() + 1200000; // update every 20 mins
-  if (!stationLat || !stationLon) return; // No location co-ordinates
+  if (!latitude || !longitude) return; // No location co-ordinates
   strcpy(weatherMsg,"");
-  bool currentWeatherValid = currentWeather.updateWeather(openWeatherMapApiKey, String(stationLat), String(stationLon));
+  bool currentWeatherValid = currentWeather.updateWeather(openWeatherMapApiKey, String(latitude), String(longitude));
   if (currentWeatherValid) {
     currentWeather.currentWeather.toCharArray(weatherMsg,sizeof(weatherMsg));
     weatherMsg[0] = toUpperCase(weatherMsg[0]);
@@ -2023,7 +2214,7 @@ void departureBoardLoop() {
 	    else drawStationBoard();
 	  } else if (noDataLoaded) showNoDataScreen();
   } else if (weatherEnabled && (millis()>nextWeatherUpdate) && (!noDataLoaded) && (!isScrollingStops) && (!isScrollingService) && (!isSleeping) && (wifiConnected)) {
-    updateCurrentWeather();
+    updateCurrentWeather(stationLat,stationLon);
   }
 
   if (millis()>timer && numMessages && !isScrollingStops && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
@@ -2137,7 +2328,7 @@ void undergroundArrivalsLoop() {
 
   if (millis()>nextDataUpdate && !isScrollingService && !isScrollingPrimary && !isSleeping && wifiConnected) {
     if (getUndergroundBoard()) {
-      if (lastUpdateResult == UPD_SUCCESS || lastUpdateResult == UPD_NO_CHANGE) drawUndergroundBoard(); // Something changed so redraw the board.
+      if (lastUpdateResult == UPD_SUCCESS || lastUpdateResult == UPD_NO_CHANGE) drawUndergroundBoard();
     } else if (lastUpdateResult == UPD_UNAUTHORISED) showTokenErrorScreen();
 	  else if (lastUpdateResult == UPD_DATA_ERROR) {
 	    if (noDataLoaded) showNoDataScreen();
@@ -2147,27 +2338,31 @@ void undergroundArrivalsLoop() {
 
     // Scrolling the additional services
   if (millis()>serviceTimer && !isScrollingService && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
-    if (station.numServices<=2 && messages.numMessages==1 && tflAttribution) {
+    if (station.numServices<=2 && messages.numMessages==1 && attributionScrolled) {
       // There are no additional services to scroll in so static attribution.
       serviceTimer = millis() + 30000;
     } else {
       // Need to change to the next service or message if there is one
-      tflAttribution = true;
+      attributionScrolled = true;
       prevService = line3Service;
       line3Service++;
-      if ((line3Service >= station.numServices && messages.numMessages==0) || (line3Service >= station.numServices+1 && messages.numMessages)) {
-        // Rollover
-        if (station.numServices>2) line3Service = 2; else line3Service = station.numServices;
-        prevMessage = currentMessage;
-        prevScrollStopsLength = scrollStopsLength;  // Save the length of the previous message
-      }
       scrollServiceYpos=11;
       scrollStopsXpos=0;
       isScrollingService = true;
       if (line3Service>=station.numServices) {
         // Showing the messages
+        prevMessage = currentMessage;
+        prevScrollStopsLength = scrollStopsLength;  // Save the length of the previous message
         currentMessage++;
-        if (currentMessage>=messages.numMessages) currentMessage=0; // Rollover
+        if (currentMessage>=messages.numMessages) {
+          if (station.numServices>2) {
+            line3Service=2;
+            currentMessage=-1; // Rollover back to services
+          } else {
+            line3Service = station.numServices;
+            currentMessage=0;
+          }
+        }
         scrollStopsLength = getStringWidth(line2[currentMessage]);
       } else {
         scrollStopsLength=SCREEN_WIDTH;
@@ -2255,6 +2450,130 @@ void undergroundArrivalsLoop() {
 }
 
 //
+// Processing loop for Bus Departures board
+//
+void busDeparturesLoop() {
+  char serviceData[8+MAXLINESIZE+MAXLOCATIONSIZE];
+  bool fullRefresh = false;
+
+  if (millis()>nextDataUpdate && !isScrollingService && !isScrollingPrimary && !isSleeping && wifiConnected) {
+    if (getBusDeparturesBoard()) {
+      if (lastUpdateResult == UPD_SUCCESS || lastUpdateResult == UPD_NO_CHANGE) drawBusDeparturesBoard(); // Something changed so redraw the board.
+    } else if (lastUpdateResult == UPD_UNAUTHORISED) showTokenErrorScreen();
+	  else if (lastUpdateResult == UPD_DATA_ERROR) {
+	    if (noDataLoaded) showNoDataScreen();
+	    else drawBusDeparturesBoard();
+	  } else if (noDataLoaded) showNoDataScreen();
+  } else if (weatherEnabled && millis()>nextWeatherUpdate && !noDataLoaded && !isScrollingService && !isScrollingPrimary && !isSleeping && wifiConnected) {
+    updateCurrentWeather(busLat,busLon);
+    // Update the weather text immediately
+    if (weatherMsg[0]) {
+      strcpy(line2[1],btAttribution);
+      strcpy(line2[0],weatherMsg);
+      messages.numMessages=2;
+    }
+  }
+
+  // Scrolling the additional services
+  if (millis()>serviceTimer && !isScrollingPrimary && !isScrollingService && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
+    // Need to change to the next service if there is one
+    if (station.numServices<=2 && messages.numMessages==1) {
+      // There are no additional services or weather to scroll in so static attribution.
+      serviceTimer = millis() + 10000;
+      line3Service=station.numServices;
+    } else {
+      // Need to change to the next service or message
+      prevService = line3Service;
+      line3Service++;
+      scrollServiceYpos=11;
+      isScrollingService = true;
+      if (line3Service>=station.numServices) {
+        // Showing the messages
+        prevMessage = currentMessage;
+        currentMessage++;
+        if (currentMessage>=messages.numMessages) {
+          if (station.numServices>2) {
+            line3Service = 2;
+            currentMessage=-1; // Rollover back to services
+          } else {
+            line3Service = station.numServices;
+            currentMessage=0;
+          }
+        }
+      }
+    }
+  }
+
+  if (isScrollingService && millis()>serviceTimer && !isSleeping) {
+    if (scrollServiceYpos) {
+      blankArea(0,ULINE3,256,10);
+      // we're scrolling up the message
+      u8g2.setClipWindow(0,ULINE3,256,ULINE3+10);
+      // Was the previous display a service?
+      if (prevService<station.numServices) {
+        drawBusService(prevService,scrollServiceYpos+ULINE3-13,busDestX);
+      } else {
+        // Scrolling up the previous message
+        centreText(line2[prevMessage],scrollServiceYpos+ULINE3-13);
+      }
+      // Is this entry a service?
+      if (line3Service<station.numServices) {
+        drawBusService(line3Service,scrollServiceYpos+ULINE3-1,busDestX);
+      } else {
+        centreText(line2[currentMessage],scrollServiceYpos+ULINE3-2);
+      }
+      u8g2.setMaxClipWindow();
+      scrollServiceYpos--;
+      if (scrollServiceYpos==0) {
+        serviceTimer = millis()+2800;
+        if (station.numServices<=2) serviceTimer+=3000;
+      }
+    } else isScrollingService=false;
+  }
+
+  if (isScrollingPrimary && !isSleeping) {
+    blankArea(0,ULINE1,256,ULINE3-ULINE1+10);
+    fullRefresh = true;
+    // we're scrolling the primary service(s) into view
+    u8g2.setClipWindow(0,ULINE1,256,ULINE1+10);
+    if (station.numServices) drawBusService(0,scrollPrimaryYpos+ULINE1-1,busDestX);
+    else centreText(F("There are no scheduled services at this stop."),scrollPrimaryYpos+ULINE1-1);
+    if (station.numServices>1) {
+      u8g2.setClipWindow(0,ULINE2,256,ULINE2+10);
+      drawBusService(1,scrollPrimaryYpos+ULINE2-1,busDestX);
+    }
+    if (station.numServices>2) {
+      u8g2.setClipWindow(0,ULINE3,256,ULINE3+10);
+      drawBusService(2,scrollPrimaryYpos+ULINE3-1,busDestX);
+    } else if (station.numServices<3 && messages.numMessages==1) {
+      // scroll up the attribution once...
+      u8g2.setClipWindow(0,ULINE3,256,ULINE3+10);
+      centreText(btAttribution,scrollPrimaryYpos+ULINE3-1);
+    }
+    u8g2.setMaxClipWindow();
+    scrollPrimaryYpos--;
+    if (scrollPrimaryYpos==0) {
+      isScrollingPrimary=false;
+      serviceTimer = millis()+2800;
+    }
+  }
+
+  if (!isSleeping) {
+    // Check if the clock should be updated
+    if (millis()>nextClockUpdate) {
+      nextClockUpdate = millis()+500;
+      drawCurrentTimeUG(true);    // just use the Tube clock for bus mode
+      u8g2.setFont(NatRailSmall9);
+    }
+
+    long delayMs = 40 - (millis()-refreshTimer);
+    if (delayMs>0) delay(delayMs);
+    if (fullRefresh) u8g2.updateDisplayArea(0,1,32,6); else u8g2.updateDisplayArea(0,5,32,2);
+    refreshTimer=millis();
+  }
+}
+
+//
 // Setup code
 //
 void setup(void) {
@@ -2268,21 +2587,26 @@ void setup(void) {
   u8g2.setFontRefHeightAll();         // Count entire font height
   u8g2.setFontPosTop();               // Reference from top
 
-  drawStartupHeading();               // Draw the startup heading
+  u8g2.drawXBM(81,0,gadeclogo_width,gadeclogo_height,gadeclogo_bits);
+  u8g2.setFont(NatRailTall12);
+  String buildDate = String(__DATE__);
+  String notice = "\x80 " + buildDate.substring(buildDate.length()-4) + F(" Gadec Software (github.com/gadec-uk)");
+  centreText(notice.c_str(),48);
   u8g2.sendBuffer();                  // Send to OLED display
-  progressBar(F("Initialising Departures Board"),0);
 
   bool isFSMounted = LittleFS.begin(true);    // Start the File System, format if necessary
   strcpy(station.location,"");                // No default location
   strcpy(weatherMsg,"");                      // No weather message
   strcpy(nrToken,"");                         // No default National Rail token
-  tflAppkey="";                               // No default TfL AppKey     
+  tflAppkey="";                               // No default TfL AppKey
   loadApiKeys();                              // Load the API keys from the apiKeys.json
   loadConfig();                               // Load the configuration settings from config.json
   u8g2.setContrast(brightness);               // Set the panel brightness to the user saved level
-  progressBar(F("Initialising Departures Board"),15);
-  u8g2.sendBuffer();
+  delay(5000);
 
+  u8g2.clearBuffer();
+  drawStartupHeading();
+  u8g2.sendBuffer();
   progressBar(F("Connecting to Wi-Fi"),30);
   WiFi.mode(WIFI_MODE_NULL);        // Reset the WiFi
   WiFi.setSleep(WIFI_PS_NONE);      // Turn off WiFi Powersaving
@@ -2433,20 +2757,24 @@ void setup(void) {
   }
 
   station.numServices=0;
-  if (tubeMode) {
-    tfldata = new TfLdataClient();
-    progressBar(F("Initialising TfL interface"),70);
-    startupProgressPercent=70;
-  } else {
-    progressBar(F("Initialising National Rail interface"),60);
-    altStationActive = setAlternateStation();  // Check & set the alternate station if appropriate
-    raildata = new raildataXmlClient();
-    int res = raildata->init(wsdlHost, wsdlAPI, &raildataCallback);
-    if (res != UPD_SUCCESS) {
-      showWsdlFailureScreen();
-      while (true) { server.handleClient(); yield();}
-    }
-    progressBar(F("Initialising National Rail interface"),70);
+  if (boardMode == MODE_RAIL) {
+      progressBar(F("Initialising National Rail interface"),60);
+      altStationActive = setAlternateStation();  // Check & set the alternate station if appropriate
+      raildata = new raildataXmlClient();
+      int res = raildata->init(wsdlHost, wsdlAPI, &raildataCallback);
+      if (res != UPD_SUCCESS) {
+        showWsdlFailureScreen();
+        while (true) { server.handleClient(); yield();}
+      }
+      progressBar(F("Initialising National Rail interface"),70);
+  } else if (boardMode == MODE_TUBE) {
+      tfldata = new TfLdataClient();
+      progressBar(F("Initialising TfL interface"),70);
+      startupProgressPercent=70;
+  } else if (boardMode == MODE_BUS) {
+      busdata = new busDataClient();
+      progressBar(F("Initialising BusTimes interface"),70);
+      startupProgressPercent=70;
   }
 }
 
@@ -2481,8 +2809,19 @@ void loop(void) {
     lastWiFiReconnect=millis();
   }
 
-  if (tubeMode) undergroundArrivalsLoop();
-  else departureBoardLoop();
+  switch (boardMode) {
+    case MODE_RAIL:
+      departureBoardLoop();
+      break;
+
+    case MODE_TUBE:
+      undergroundArrivalsLoop();
+      break;
+
+    case MODE_BUS:
+      busDeparturesLoop();
+      break;
+  }
 
   server.handleClient();
 }

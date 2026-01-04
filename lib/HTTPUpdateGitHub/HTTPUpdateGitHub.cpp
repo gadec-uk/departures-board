@@ -1,11 +1,11 @@
 /*
- * HTTPUpdateGitHub Library (c) 2025 Gadec Software
+ * HTTPUpdateGitHub Library (c) 2025-2026 Gadec Software
  *  - based on orignal HTTPUpdate for ESP32 by Markus Sattler
  *  - Added ability to use GitHub token for updating from private repositories
  *  - Added correct handling of redirects
  *  - Added correct checking of MD5 hash from GitHub server
  *  - Removed redundant code
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -24,25 +24,25 @@
 
  #include <HTTPUpdateGitHub.h>
  #include <StreamString.h>
- 
+
  #include <esp_partition.h>
  #include <esp_ota_ops.h>                // get running partition
  #include <md5Utils.h>
-  
+
  HTTPUpdate::HTTPUpdate(void)
          : _httpClientTimeout(8000)
  {
  }
- 
+
  HTTPUpdate::HTTPUpdate(int httpClientTimeout)
          : _httpClientTimeout(httpClientTimeout)
  {
  }
- 
+
  HTTPUpdate::~HTTPUpdate(void)
  {
  }
- 
+
  /**
   * return error code as int
   */
@@ -50,17 +50,17 @@
  {
      return _lastError;
  }
- 
+
  /**
   * return error code as String
   */
  String HTTPUpdate::getLastErrorString(void)
  {
- 
+
      if(_lastError == 0) {
          return String(); // no error
      }
- 
+
      // error from Update class
      if(_lastError > 0) {
          StreamString error;
@@ -68,12 +68,12 @@
          error.trim(); // remove line ending
          return String("Update error: ") + error;
      }
- 
+
      // error from http client
      if(_lastError > -100) {
          return String("HTTP error: ") + HTTPClient::errorToString(_lastError);
      }
- 
+
      switch(_lastError) {
      case HTTP_UE_TOO_LESS_SPACE:
          return "Not Enough space";
@@ -94,17 +94,17 @@
      case HTTP_UE_NO_PARTITION:
          return "Partition Could Not be Found";
      }
- 
+
      return String();
  }
- 
+
  /*
-  * HTTPUpdate is now exposed directly from the library. 
+  * HTTPUpdate is now exposed directly from the library.
   *  - optionally pass GitHub token for downloads from private repository.
   *  - handles redirects correctly.
   */
   HTTPUpdateResult HTTPUpdate::handleUpdate(WiFiClient& client, const String& uri = "/", const String& token = "") {
- 
+
      HTTPUpdateResult ret = HTTP_UPDATE_FAILED;
 
      HTTPClient http;
@@ -119,8 +119,8 @@
         if(!http.begin(client, url))
         {
             return HTTP_UPDATE_FAILED;
-        }     
-     
+        }
+
         // use HTTP/1.0 for update since the update handler does not support any transfer Encoding
         http.useHTTP10(true);
         http.setTimeout(_httpClientTimeout);
@@ -134,10 +134,10 @@
 
         const char * headerkeys[] = { "x-ms-blob-content-md5" };    // GitHub uses x-ms-blob-content-m5d, not x-md5
         size_t headerkeyssize = sizeof(headerkeys) / sizeof(char*);
- 
+
         // track the MD5 hash
         http.collectHeaders(headerkeys, headerkeyssize);
-  
+
         int code = http.GET();
         int len = http.getSize();
         log_d("HTTP GET result %d\n",code);
@@ -163,23 +163,23 @@
                 http.end();
                 return HTTP_UPDATE_FAILED;
             }
-        
+
             log_d("Header read fin.\n");
             log_d("Server header:\n");
             log_d(" - code: %d\n", code);
             log_d(" - len: %d\n", len);
-        
+
             if(http.hasHeader("x-ms-blob-content-md5")) {
                 log_d(" - MD5: %s\n", http.header("x-ms-blob-content-md5").c_str());
                 // Convert the base64 encoded MD5 back to a hex string
                 md5Hex = md5.base64ToHex(String(http.header("x-ms-blob-content-md5")));
                 log_d(" - MD5 Hex: %s\n", md5Hex.c_str());
             }
-        
+
             log_d("ESP32 info:\n");
             log_d(" - free Space: %d\n", ESP.getFreeSketchSpace());
             log_d(" - current Sketch Size: %d\n", ESP.getSketchSize());
-                
+
             switch(code) {
             case HTTP_CODE_OK:  ///< OK (Start Update)
                 if(len > 0) {
@@ -194,7 +194,7 @@
                         log_e("FreeSketchSpace to low (%d) needed: %d\n", sketchFreeSpace, len);
                         startUpdate = false;
                     }
-        
+
                     if(!startUpdate) {
                         _lastError = HTTP_UE_TOO_LESS_SPACE;
                         ret = HTTP_UPDATE_FAILED;
@@ -203,10 +203,10 @@
                         if (_cbStart) {
                             _cbStart();
                         }
-        
+
                         WiFiClient * tcp = http.getStreamPtr();
                         delay(200);
-        
+
                         int command;
                         command = U_FLASH;
                         log_d("runUpdate flash...\n");
@@ -227,11 +227,11 @@
                             if (_cbEnd) {
                                 _cbEnd();
                             }
-        
+
                             if(_rebootOnUpdate) {
                                 ESP.restart();
                             }
-        
+
                         } else {
                             ret = HTTP_UPDATE_FAILED;
                             log_e("Update failed\n");
@@ -261,7 +261,7 @@
                 log_e("HTTP Code is (%d)\n", code);
                 break;
             }
-        
+
             http.end();
             return ret;
         }
@@ -269,7 +269,7 @@
     log_e("Too many redirects!");
     return HTTP_UPDATE_FAILED;
 }
- 
+
  /**
   * write Update to flash
   * @param in Stream&
@@ -280,11 +280,11 @@
  bool HTTPUpdate::runUpdate(Stream& in, uint32_t size, String md5, int command)
  {
       StreamString error;
- 
+
      if (_cbProgress) {
          Update.onProgress(_cbProgress);
      }
- 
+
      if(!Update.begin(size, command)) {
          _lastError = Update.getError();
          Update.printError(error);
@@ -292,11 +292,11 @@
          log_e("Update.begin failed! (%s)\n", error.c_str());
          return false;
      }
- 
+
      if (_cbProgress) {
          _cbProgress(0, size);
      }
- 
+
      if(md5.length()) {
          if(!Update.setMD5(md5.c_str())) {
              _lastError = HTTP_UE_SERVER_FAULTY_MD5;
@@ -304,7 +304,7 @@
              return false;
          }
      }
-  
+
      if(Update.writeStream(in) != size) {
          _lastError = Update.getError();
          Update.printError(error);
@@ -312,11 +312,11 @@
          log_e("Update.writeStream failed! (%s)\n", error.c_str());
          return false;
      }
- 
+
      if (_cbProgress) {
          _cbProgress(size, size);
      }
- 
+
      if(!Update.end()) {
          _lastError = Update.getError();
          Update.printError(error);
@@ -324,11 +324,10 @@
          log_e("Update.end failed! (%s)\n", error.c_str());
          return false;
      }
- 
+
      return true;
  }
- 
+
  #if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_HTTPUPDATE)
  HTTPUpdate httpUpdate;
  #endif
- 

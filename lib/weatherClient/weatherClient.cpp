@@ -1,5 +1,5 @@
 /*
- * Departures Board (c) 2025 Gadec Software
+ * Departures Board (c) 2025-2026 Gadec Software
  *
  * OpenWeatherMap Weather Client Library
  *

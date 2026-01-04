@@ -1,21 +1,19 @@
 # departures-board [![License Badge](https://img.shields.io/badge/BY--NC--SA%204.0%20License-grey?style=flat&logo=creativecommons&logoColor=white)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
-This is an ESP32 based mini Departures Board replicating those at many UK railway stations using data provided by National Rail's public API and replicating London Underground Arrivals boards using data provided by TfL . This implementation uses a 3.12" OLED display panel with SSD1322 display controller onboard. STL files are also provided for 3D printing the custom desktop case.
-
-> [!IMPORTANT]
-> Several individuals are currently selling pre-assembled departure boards on eBay as their own commercial products, with mark-ups of approximately 300% over the component costs. These sellers have neither contributed to the development of this software nor sought permission to use it, and their actions constitute a violation of the terms of the [licence agreement](#licence).
+This is an ESP32 based mini Departures Board replicating those at many UK railway stations (using data provided by National Rail's public API), London Underground Arrivals boards (using data provided by TfL) and UK wide bus stops (using data provided by bustimes.org). This implementation uses a 3.12" OLED display panel with SSD1322 display controller onboard. STL files are also provided for 3D printing the custom desktop case.
 
 ## Features
 * All processing is done onboard by the ESP32 processor
 * Smooth animation matching the real departures and arrivals boards
 * Displays up to the next 9 departures with scheduled time, platform number, destination, calling stations and expected departure time
-* Optionally only show services calling at a selected station
-* Optionally display an alternate station between specific hours of the day
+* Optionally only show services calling at a selected railway station
+* Optionally display an alternate railway station between specific hours of the day
 * Network Rail service messages
 * Train information (operator, class, number of coaches etc.)
 * Displays up to the next 9 arrivals with time to station (London Underground mode)
 * TfL station and network service messages (London Underground mode)
-* Fully-featured Web UI - choose any station on the UK network / London Tube & DLR network
+* **New Bus mode** - Displays up to the next 9 departures with service number, destination, vehicle registration and schedule/expected time (requires **firmware v1.8 or above**)
+* Fully-featured Web UI - choose any station on the UK network / London Tube & DLR network / UK Bus Stops
 * Automatic firmware updates (optional)
 * Displays the weather at the selected location (optional)
 * STL files provided for custom 3D printed case
@@ -94,15 +92,16 @@ Once the ESP32 has established an Internet connection, the next step is to enter
 ### Web GUI
 
 At start-up, the ESP32's IP address is displayed. To change the station or to configure other miscellaneous settings, open the web page at that address. The settings available are:
+- **Board Mode** - switch between National Rail Departures, London Underground Arrivals or UK Bus Stops modes (**firmware v1.8 or above**)
 - **Station** - start typing a few characters of a station name and select from the drop-down station picker displayed (National Rail mode).
 - **Only show services calling at** - filter services based on *calling at* location (National Rail mode - if you want to see the next trains *to* a particular station). Note this option cannot be combined with the *Alternate station* feature.
 - **Alternate station** - automatically switch to displaying an alternate station between the hours set here (National Rail mode).
 - **Underground Station** - start typing a few characters of an Underground or DLR station name and select from the drop-down station picker displayed (London Underground mode).
+- **Bus Stop ATCO code** - Type the ATCO number of the bus stop you want to monitor (see [below](#bus-stop-atco-codes) for details).
 - **Brightness** - adjusts the brightness of the OLED screen.
-- **London Underground Arrivals Board Mode** - switch between National Rail Departures Board and London Underground Arrivals Board modes.
 - **Show the date on screen** - displays the date in the upper-right corner (useful if you're also using this as a desk clock!)
-- **Include Bus services** - optionally include bus replacement services (shown with a small bus icon in place of platform number).
-- **Include current weather at station location** - this option requires a valid OpenWeather Map API key (see above).
+- **Include Bus services** - optionally include bus replacement services (National Rail mode - shown with a small bus icon in place of platform number).
+- **Include current weather at station location** - this option requires a valid OpenWeather Map API key (National Rail/Bus mode).
 - **Increase API refresh rate** - Reduces the interval between data refreshes (National Rail mode). Uses more data and is not usually required.
 - **Enable automatic firmware updates at startup** - automatically checks for AND installs the latest firmware from this repository.
 - **Enable overnight sleep mode (screensaver)** - if you're running the board 24/7, you can help prevent screen burn-in by enabling this option overnight.
@@ -122,6 +121,11 @@ A few other urls have been implemented, primarily for debugging/developer use:
 - **/formatffs** - formats the filing system, erasing the configuration & Web GUI (but not the WiFi credentials).
 - **/dir** - displays a (basic) directory listing of the file system with the ability to view/delete files.
 - **/upload** - upload a file to the file system.
+
+### Bus Stop ATCO codes
+Every UK bus stop has a unique ATCO code number. To find the ATCO code of the stop you want to monitor, go to [bustimes.org/search](https://bustimes.org/search) and type a location in the search box. Select the location from the list of places shown and then select the particular stop you want from the list. The ATCO code is shown on the stop information page. After entering the code in the Departures Board setup screen, tap the **Verify** button and the location will be shown confirming your selection. You must use the **Verify** button *before* you can save changes.
+
+<img src="https://github.com/user-attachments/assets/8a41ec6d-5f15-4102-b3d5-c09260986319" align="center">
 
 ### Donating
 

@@ -13,29 +13,14 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml"/>
     <title>Departures Board</title>
 </head>
-<style>
-.dropdown-submenu {
-  position: relative;
-}
-
-.dropdown-submenu > .dropdown-menu {
-  top: 0;
-  left: -100%;
-  margin-top: -1px;
-}
-
-.tick {
-  display: inline-block;
-  width: 16px;
-}
-</style>
 <body>
   <div style="width: min(90%, 500px); margin: 0 auto; padding: 0 5px;">
     <form id="formsettings">
       <fieldset>
         <legend style="position: relative; text-align: center; min-height: 45px; padding-top:8px;">
-          <div id="nrT" style="display:none">Departures Board Setup</div>
-          <div id="tflT" style="display:none">Arrivals Board Setup</div>
+          <div id="nrT" style="display:none">Rail Departures Board</div>
+          <div id="tflT" style="display:none">Tube Arrivals Board</div>
+          <div id="busT" style="display:none">Bus Departures Board</div>
           <div class="dropdown" style="position: absolute; top: 5px; right: 0;">
             <button class="btn btn-default dropdown-toggle" type="button" id="menuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
               &#9776;
@@ -49,6 +34,22 @@
           </div>
         </legend>
 
+        <!-- Board Mode Selector -->
+        <div class="form-group" id="modeSelector">
+          <label class="control-label">Board Mode</label>
+          <div class="btn-group btn-group-justified" data-toggle="buttons">
+            <label id="btnRail" class="btn btn-default">
+              <input type="radio" name="boardmode" id="modeRail" value="0"> Rail
+            </label>
+            <label id="btnTube" class="btn btn-default">
+              <input type="radio" name="boardmode" id="modeTube" value="1"> Tube
+            </label>
+            <label id="btnBus" class="btn btn-default">
+              <input type="radio" name="boardmode" id="modeBus" value="2"> Bus
+            </label>
+          </div>
+        </div>
+
         <div class="form-group" id="nrSearchBox" style="display:none">
           <label class="control-label" for="searchName">Station</label>
           <input id="searchName" type="text" placeholder="Type the station name" class="form-control input-md typeahead">
@@ -57,6 +58,20 @@
         <div class="form-group" id="tflSearchBox" style="display:none">
           <label class="control-label" for="searchNameTfL">Underground Station</label>
           <input id="searchNameTfL" type="text" placeholder="Type the underground station name" class="form-control input-md typeahead">
+        </div>
+
+        <div class="form-group" id="busAtcoBox" style="display:none">
+          <label class="control-label" for="busAtco">Bus Stop ATCO code</label>
+          <div style="display: flex; gap: 10px;">
+            <div style="flex: 1;">
+              <input id="busAtco" type="text" placeholder="Enter the ATCO code and press verify" class="form-control input-md" style="width:100%;">
+            </div>
+            <div style="flex-shrink: 0;">
+              <button id="verifyAtco" name="verifyAtco" class="btn" type="button" disabled>Verify</button>
+            </div>
+          </div>
+          <span class="help-block" id="busAtcoLongName" style="margin-bottom: 0;"></span>
+          <span class="help-block">Find bus stop ATCO codes at <a href="https://bustimes.org/search" target="_blank">bustimes.org</a>. Tap <a href="https://github.com/gadec-uk/departures-board/#bus-stop-atco-codes" target="_blank">here</a> for full instructions.</span>
         </div>
 
         <div class="form-group" id="nrCallingBox" style="display:none">
@@ -154,19 +169,16 @@
         <div class="form-group">
           <label class="control-label">Options</label>
           <div class="checkbox">
-            <label><input type="checkbox" id="tubeMode"> London Underground Arrivals Board Mode</label>
-          </div>
-          <div class="checkbox">
             <label><input type="checkbox" id="showDate"> Show the date on screen</label>
           </div>
           <div id="optBuses" class="checkbox" style="display:none">
             <label><input type="checkbox" id="enableBuses"> Include Bus services (National Rail)</label>
           </div>
           <div id="optWeather" class="checkbox" style="display:none">
-            <label><input type="checkbox" id="enableWeather"> Include current weather at station (National Rail)</label>
+            <label><input type="checkbox" id="enableWeather"> Include current weather at location</label>
           </div>
           <div id="optFastRefresh" class="checkbox" style="display:none">
-            <label><input type="checkbox" id="enableFastRefresh"> Increase API refresh rate (National Rail)</label>
+            <label><input type="checkbox" id="enableFastRefresh"> Increase API refresh rate</label>
           </div>
           <div class="checkbox">
             <label><input type="checkbox" id="enableFirmware"> Enable automatic firmware updates at startup</label>
@@ -253,9 +265,13 @@
             <div id="tflAtt" style="display:none">
               <a href="https://tfl.gov.uk/" target="_blank"><img src="/tfllogo.webp" alt="Logo" style="max-height: 40px;"></a>
             </div>
+            <div id="btAtt" style="display:none">
+              <a href="https://bustimes.org/" target="_blank"><img src="/btlogo.webp" alt="Logo" style="max-height: 40px;"></a>
+            </div>
           </div>
+          <hr style="margin: 10px 0;">
+          <span class="help-block text-center">&copy; 2026 Gadec Software. This work is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">Creative Commons Attribution-NonCommercial-ShareAlike 4.0</a>. Any commercial use of this work, including reselling in kit or assembled form, is prohibited.</span>
         </div>
-
       </fieldset>
     </form>
   </div>
@@ -270,7 +286,12 @@
       stationLongitude: 0,
       tubeName: "",
       tubeId: "",
-      tubeMode: false,
+      busName: "",
+      busId: "",
+      busLat: 0,
+      busLon: 0,
+      busIdOK: false,
+      boardMode: 0, //0=Rail, 1=Tube, 2=Bus
       appKey: "",
       stationLatitude: 0,
       stationLongitude: 0,
@@ -294,7 +315,6 @@
       searchNameTfL: document.getElementById("searchNameTfL"),
       callingStation: document.getElementById("callingStation"),
       brightness: document.getElementById("brightness"),
-      tubeMode: document.getElementById("tubeMode"),
       enableSleep: document.getElementById("enableSleep"),
       sleepStart: document.getElementById("sleepStart"),
       sleepEnd: document.getElementById("sleepEnd"),
@@ -304,7 +324,10 @@
       altStation: document.getElementById("altStation"),
       clearAltButton: document.getElementById("clearAltStation"),
       altStart: document.getElementById("altStart"),
-      altEnd: document.getElementById("altEnd")
+      altEnd: document.getElementById("altEnd"),
+      verifyAtcoButton: document.getElementById("verifyAtco"),
+      busAtco: document.getElementById("busAtco"),
+      busLongName: document.getElementById("busAtcoLongName")
     };
 
     const substringMatcher = () => {
@@ -412,15 +435,20 @@
     elements.enableSleep.addEventListener("change", toggleSleepSelectors);
     elements.brightness.addEventListener("change", handleBrightnessChange);
     elements.clearButton.addEventListener("click", handleClearFilter);
-    elements.tubeMode.addEventListener("click", toggleBoardMode);
     elements.altStation.addEventListener("focus", () => elements.altStation.select());
     elements.altStation.addEventListener("blur", () => setTimeout(handleAltStationLostFocus, 500));
     elements.clearAltButton.addEventListener("click", handleClearAltStation);
+    elements.verifyAtcoButton.addEventListener("click", handleVerifyAtco);
 
     document.addEventListener("DOMContentLoaded", async () => {
       await fetchConfig();
       await fetchFirmware();
       await fetchApiKeys();
+    });
+
+    $("input[name=boardmode]").on("change", function(){
+        appState.boardMode = parseInt(this.value);
+        applyBoardMode();
     });
 
     async function fetchConfig() {
@@ -430,7 +458,7 @@
         appState.jsonSettings = await response.json();
         loadSettings();
       } catch (err) {
-        alert('Error loading config: ${err.message}');
+        alert(`Error loading config: ${err.message}`);
       }
     }
 
@@ -442,7 +470,7 @@
         if (contentType === "application/json") {
           const jsonInfo = await response.json();
           appState.firmwareVersion = jsonInfo.firmware || "";
-          elements.fwinfo.innerHTML = '<a href="https://github.com/gadec-uk/departures-board" target="_blank">Firmware: ' + appState.firmwareVersion + '</a>';
+          elements.fwinfo.innerHTML = '<a href="https://github.com/gadec-uk/departures-board#readme" target="_blank">Firmware: ' + appState.firmwareVersion + '</a>';
         }
       } catch (err) {
         console.error("Firmware fetch error:", err);
@@ -462,6 +490,55 @@
       }
     }
 
+    async function getBusStopName(busId) {
+        try {
+            const response = await fetch(`https://bustimes.org/api/stops/${busId}`);
+
+            if (!response.ok) {
+                // HTTP error returned when invalid Atco
+                appState.busName = "";
+                appState.busLat = 0;
+                appState.busLon = 0;
+                return false;
+            }
+
+            const data = await response.json();
+            appState.busName = data.long_name ?? "";
+            if (Array.isArray(data.location) && data.location.length === 2) {
+                appState.busLon = data.location[0];
+                appState.busLat = data.location[1];
+            } else {
+                appState.busLat = 0;
+                appState.busLon = 0;
+            }
+            return true;
+
+        } catch (error) {
+            // Network or other fetch error
+            console.error("Error fetching bus stop data:", error);
+            appState.busName = "";
+            appState.busLat = 0;
+            appState.busLon = 0;
+            return false;
+        }
+    }
+
+    async function handleVerifyAtco() {
+        const userAtco = elements.busAtco.value.trim();
+        const success = await getBusStopName(userAtco);
+        if (success) {
+          appState.busId = userAtco;
+          appState.busIdOK = true;
+          elements.busLongName.innerHTML = "Location: <b>" + appState.busName + "</b>";
+          elements.saveButton.removeAttribute("disabled");
+        } else {
+          elements.saveButton.setAttribute("disabled", true);
+          elements.busLongName.innerHTML = "";
+          appState.busIdOK = false;
+          alert("The Bus Stop ATCO code you entered could not be found.");
+        }
+    }
+
     function toggleSleepSelectors() {
       const enabled = elements.enableSleep.checked;
       elements.sleepStart.disabled = !enabled;
@@ -474,26 +551,63 @@
       elements.altEnd.disabled = !enabled;
     }
 
-    function toggleBoardMode() {
-      const enableTube = elements.tubeMode.checked;
-      appState.tubeMode = enableTube;
-      show("tflT",enableTube);
-      show("tflSearchBox",enableTube);
-      show("tflAtt",enableTube);
-      show ("nrT",!enableTube);
-      show("nrSearchBox",!enableTube);
-      show("nrCallingBox",!enableTube);
-      show("nrAtt",!enableTube);
-      show("nrAltStation",!enableTube);
-      show("optBuses",!enableTube);
-      show("optWeather",!enableTube);
-      show("optFastRefresh",!enableTube);
-      if ((enableTube && appState.tubeName) || (!enableTube && appState.stationName)) {
-        elements.saveButton.removeAttribute("disabled");
-       } else {
-        elements.saveButton.setAttribute("disabled", true);
-       }
+    function applyBoardMode() {
+        const mode = appState.boardMode;
+
+        const rail = (mode === 0);
+        const tube = (mode === 1);
+        const bus  = (mode === 2);
+
+        show("nrT", rail);
+        show("nrSearchBox", rail);
+        show("nrCallingBox", rail);
+        show("nrAtt", rail);
+        show("nrAltStation", rail);
+        show("optBuses", rail);
+        show("optWeather", rail);
+        show("optFastRefresh", rail);
+
+        show("tflT", tube);
+        show("tflSearchBox", tube);
+        show("tflAtt", tube);
+
+        show("busT", bus);
+        show("busAtcoBox", bus);
+        show("btAtt",bus);
+        show("optWeather",bus);
+
+        if (
+            (rail && appState.stationName) ||
+            (tube && appState.tubeName)    ||
+            (bus && appState.busIdOK)
+        ) {
+            elements.saveButton.removeAttribute("disabled");
+        } else {
+            elements.saveButton.setAttribute("disabled", true);
+        }
+        highlightModeButtons(mode);
     }
+
+    function highlightModeButtons(mode){
+        $("#btnRail").toggleClass("active", mode===0);
+        $("#btnTube").toggleClass("active", mode===1);
+        $("#btnBus").toggleClass("active", mode===2);
+    }
+
+    function validateAtcoFormat() {
+        const atcoPattern = /^\d{3}0.{1,}$/;
+        const atcoVal  = $('#busAtco').val().trim();
+        const atcoEntered  = atcoVal.length > 0;
+        const atcoValid  = !atcoEntered  || atcoPattern.test(atcoVal);
+        $('#verifyAtco').prop('disabled', !atcoValid);
+    }
+
+    $('#busAtco').on('input', function () {
+        validateAtcoFormat();
+        elements.saveButton.setAttribute("disabled", true);
+        elements.busLongName.innerHTML="";
+        appState.busIdOK = false;
+    });
 
     function loadSettings() {
       const s = appState.jsonSettings;
@@ -507,10 +621,21 @@
 
       appState.tubeName = s.tubeName || "";
       appState.tubeId = s.tubeId || "";
-      appState.tubeMode = s.tube || false;
+
+      appState.busId = s.busId || "";
+      appState.busName = s.busName || "";
+      appState.busLat = s.busLat || 0;
+      appState.busLon = s.busLon || 0;
+      appState.busIdOK = appState.busId.length > 0 && appState.busName.length > 0;
+
+      appState.boardMode = s.mode ?? (s.tube != undefined ? (s.tube ? 1 : 0) : 0);  //handle legacy
+      delete s.tube;
+      highlightModeButtons(appState.boardMode);
+      applyBoardMode();
       elements.searchName.value = appState.stationName;
       elements.callingStation.value = appState.callingStation;
       elements.searchNameTfL.value = appState.tubeName;
+      elements.busAtco.value = appState.busId;
       elements.brightness.value = s.brightness || 50;
       const pct = (elements.brightness.value/255)*100;
       elements.brightness.title = Math.round(pct) + "%";
@@ -523,7 +648,8 @@
       appState.altEnds = s.altEnds || 23;
       elements.altStation.value = appState.altStation;
 
-      setCheckbox("tubeMode", s.tube);
+      elements.busLongName.innerHTML = "Location: <b>" + appState.busName + "</b>";
+
       setCheckbox("enableSleep", s.sleep);
       setCheckbox("showDate", s.showDate);
       setCheckbox("enableBuses", s.showBus);
@@ -538,7 +664,6 @@
 
       toggleSleepSelectors();
       toggleAltSelectors();
-      toggleBoardMode();
     }
 
     function setCheckbox(id, value) {
@@ -652,7 +777,7 @@
       s.callingCrs = appState.callingCrs;
       s.tubeId = appState.tubeId;
       s.tubeName = appState.tubeName;
-      s.tube = appState.tubeMode;
+      s.mode = appState.boardMode;
       s.brightness = elements.brightness.value;
       s.sleep = isChecked("enableSleep");
       s.showDate = isChecked("showDate");
@@ -668,7 +793,12 @@
       s.altLon = appState.altLongitude;
       s.altStarts = parseInt(elements.altStart.value);
       s.altEnds = parseInt(elements.altEnd.value);
-
+      if (appState.busIdOK) {
+        s.busName = appState.busName;
+        s.busId = appState.busId;
+        s.busLat = appState.busLat;
+        s.busLon = appState.busLon;
+      }
       try {
         const response = await fetch('/savesettings', {
           method: 'POST',
