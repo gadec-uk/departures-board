@@ -71,7 +71,6 @@
             </div>
           </div>
           <span class="help-block" id="busAtcoLongName"></span>
-
           <div id="busAtcoHistory" style="display:none">
             <label for="busAtcoHistoryList">Recently verified ATCO codes</label>
             <div style="display: flex; gap: 10px;">
@@ -83,6 +82,8 @@
                 <button id="clearHistory" name="clearHistory" class="btn" type="button">Clear History</button>
               </div>
             </div>
+          </div>
+          <div>
             <span class="help-block">Find bus stop ATCO codes at <a href="https://bustimes.org/search" target="_blank">bustimes.org</a>. Tap <a href="https://github.com/gadec-uk/departures-board/#bus-stop-atco-codes" target="_blank">here</a> for full instructions.</span>
           </div>
         </div>
@@ -774,7 +775,7 @@
       appState.altEnds = s.altEnds || 23;
       elements.altStation.value = appState.altStation;
 
-      elements.busLongName.innerHTML = "Location: <b>" + appState.busName + "</b>";
+      if (appState.busName.length) elements.busLongName.innerHTML = "Location: <b>" + appState.busName + "</b>";
 
       setCheckbox("enableSleep", s.sleep);
       setCheckbox("showDate", s.showDate);
