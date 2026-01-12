@@ -71,7 +71,9 @@ class raildataXmlClient: public xmlListener {
         bool endXml;
 
         char filterCrs[4];
+        char filterPlatform[4];
         bool filter = false;
+        bool filterByPlatform = false;
         bool keepRoute = false;
 
         rdCallback Xcb;
@@ -92,6 +94,6 @@ class raildataXmlClient: public xmlListener {
     public:
         raildataXmlClient();
         int init(const char *wsdlHost, const char *wsdlAPI, rdCallback RDcb);
-        int updateDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode);
+        int updateDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platformFilter);
         String getLastError();
 };

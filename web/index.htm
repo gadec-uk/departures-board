@@ -100,6 +100,18 @@
           </div>
         </div>
 
+        <div class="form-group" id="nrPlatformBox" style="display:none">
+          <label class="control-label" for="filterPlatform">Only show services on platform</label>
+          <div style="display: flex; gap: 10px;">
+            <div style="flex: 1;">
+              <input id="filterPlatform" type="text" placeholder="Platform number/letter or leave blank for all platforms" class="form-control input-md" style="width:100%;" maxlength="3">
+            </div>
+            <div style="flex-shrink: 0;">
+              <button id="clearPlatformFilter" name="clearPlatformFilter" class="btn" type="button">Clear</button>
+            </div>
+          </div>
+        </div>
+
         <div class="form-group" id="nrAltStation" style="display:none">
           <label class="control-label" for="altStation">Alternate station</label>
           <div style="display: flex; gap: 10px;">
@@ -169,6 +181,28 @@
                   <option value="22">22:00</option>
                   <option value="23">23:00</option>
                 </select>
+              </div>
+            </div>
+          </div>
+          <div class="form-group" id="altCallingBox" style="padding-top: 10px; display:none">
+            <label class="control-label" for="altCallingStation">Alternate: Only show services calling at</label>
+            <div style="display: flex; gap: 10px;">
+              <div style="flex: 1;">
+                <input id="altCallingStation" type="text" placeholder="Station name or leave blank for all services" class="form-control input-md typeahead" style="width:100%;">
+              </div>
+              <div style="flex-shrink: 0;">
+                <button id="clearAltCallingFilter" name="clearAltCallingFilter" class="btn" type="button">Clear</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-group" id="altPlatformBox" style="padding-top: 10px; display:none">
+            <label class="control-label" for="altFilterPlatform">Alternate: Only show services on platform</label>
+            <div style="display: flex; gap: 10px;">
+              <div style="flex: 1;">
+                <input id="altFilterPlatform" type="text" placeholder="Platform number/letter or leave blank for all platforms" class="form-control input-md" style="width:100%;" maxlength="3">
+              </div>
+              <div style="flex-shrink: 0;">
+                <button id="clearAltPlatformFilter" name="clearAltPlatformFilter" class="btn" type="button">Clear</button>
               </div>
             </div>
           </div>
@@ -315,6 +349,7 @@
       callingStationSelected: false,
       callingStation: "",
       callingCrs: "",
+      filterPlatform: "",
       altStationSelected: false,
       altStation: "",
       altCrs: "",
@@ -322,6 +357,10 @@
       altLongitude: 0,
       altStarts: 0,
       altEnds: 23,
+      altCallingStationSelected: false,
+      altCallingStation: "",
+      altCallingCrs: "",
+      altFilterPlatform: "",
       firmwareVersion: "",
       jsonSettings: {},
       atcoHistory: []
@@ -332,15 +371,21 @@
       searchName: document.getElementById("searchName"),
       searchNameTfL: document.getElementById("searchNameTfL"),
       callingStation: document.getElementById("callingStation"),
+      filterPlatform: document.getElementById("filterPlatform"),
       brightness: document.getElementById("brightness"),
       enableSleep: document.getElementById("enableSleep"),
       sleepStart: document.getElementById("sleepStart"),
       sleepEnd: document.getElementById("sleepEnd"),
       saveButton: document.getElementById("save"),
       clearButton: document.getElementById("clearFilter"),
+      clearPlatformButton: document.getElementById("clearPlatformFilter"),
       fwinfo: document.getElementById("fwinfo"),
       altStation: document.getElementById("altStation"),
+      altCallingStation: document.getElementById("altCallingStation"),
+      altFilterPlatform: document.getElementById("altFilterPlatform"),
       clearAltButton: document.getElementById("clearAltStation"),
+      clearAltCallingButton: document.getElementById("clearAltCallingFilter"),
+      clearAltPlatformButton: document.getElementById("clearAltPlatformFilter"),
       altStart: document.getElementById("altStart"),
       altEnd: document.getElementById("altEnd"),
       verifyAtcoButton: document.getElementById("verifyAtco"),
@@ -530,6 +575,18 @@
       }
     });
 
+    $(elements.altCallingStation).typeahead({
+      name: 'stations',
+      source: substringMatcher(),
+      updater: function(item) {
+        handleAltCallingStationSelected(item);
+        return item;
+      },
+      highlighter: function(item) {
+        return '<img src="/nr.webp" style="margin-right:6px">' + item;
+      }
+    });
+
     $(elements.searchNameTfL).typeahead({
       name: 'stations',
       source: substringMatcherTfL(),
@@ -552,14 +609,23 @@
     elements.searchName.addEventListener("blur", () => setTimeout(handleStationLostFocus, 500));
     elements.callingStation.addEventListener("focus", () => elements.callingStation.select());
     elements.callingStation.addEventListener("blur", () => setTimeout(handleCallingStationLostFocus, 500));
+    elements.filterPlatform.addEventListener("focus", () => elements.filterPlatform.select());
+    elements.filterPlatform.addEventListener("input", handlePlatformInput);
     elements.searchNameTfL.addEventListener("focus", () => elements.searchNameTfL.select());
     elements.searchNameTfL.addEventListener("blur", () => setTimeout(handleTfLStationLostFocus, 500));
     elements.enableSleep.addEventListener("change", toggleSleepSelectors);
     elements.brightness.addEventListener("change", handleBrightnessChange);
     elements.clearButton.addEventListener("click", handleClearFilter);
+    elements.clearPlatformButton.addEventListener("click", handleClearPlatformFilter);
     elements.altStation.addEventListener("focus", () => elements.altStation.select());
     elements.altStation.addEventListener("blur", () => setTimeout(handleAltStationLostFocus, 500));
     elements.clearAltButton.addEventListener("click", handleClearAltStation);
+    elements.altCallingStation.addEventListener("focus", () => elements.altCallingStation.select());
+    elements.altCallingStation.addEventListener("blur", () => setTimeout(handleAltCallingStationLostFocus, 500));
+    elements.clearAltCallingButton.addEventListener("click", handleClearAltCallingFilter);
+    elements.altFilterPlatform.addEventListener("focus", () => elements.altFilterPlatform.select());
+    elements.altFilterPlatform.addEventListener("input", handleAltPlatformInput);
+    elements.clearAltPlatformButton.addEventListener("click", handleClearAltPlatformFilter);
     elements.verifyAtcoButton.addEventListener("click", handleVerifyAtco);
     elements.clearHistoryButton.addEventListener("click", handleClearHistory);
     elements.busAtcoHistoryList.addEventListener('change', handleAtcoHistorySelect);
@@ -675,6 +741,8 @@
       const enabled = appState.altCrs;
       elements.altStart.disabled = !enabled;
       elements.altEnd.disabled = !enabled;
+      show("altCallingBox", enabled);
+      show("altPlatformBox", enabled);
     }
 
     function applyBoardMode() {
@@ -687,6 +755,7 @@
         show("nrT", rail);
         show("nrSearchBox", rail);
         show("nrCallingBox", rail);
+        show("nrPlatformBox", rail);
         show("nrAtt", rail);
         show("nrAltStation", rail);
         show("optBuses", rail);
@@ -745,6 +814,7 @@
 
       appState.callingStation = s.callingStation || "";
       appState.callingCrs = s.callingCrs || "";
+      appState.filterPlatform = s.filterPlatform || "";
 
       appState.tubeName = s.tubeName || "";
       appState.tubeId = s.tubeId || "";
@@ -761,6 +831,7 @@
       applyBoardMode();
       elements.searchName.value = appState.stationName;
       elements.callingStation.value = appState.callingStation;
+      elements.filterPlatform.value = appState.filterPlatform;
       elements.searchNameTfL.value = appState.tubeName;
       elements.busAtco.value = appState.busId;
       elements.brightness.value = s.brightness || 50;
@@ -773,7 +844,12 @@
       appState.altLongitude = s.altLon || 0;
       appState.altStarts = s.altStarts || 12;
       appState.altEnds = s.altEnds || 23;
+      appState.altCallingStation = s.altCallingStation || "";
+      appState.altCallingCrs = s.altCallingCrs || "";
+      appState.altFilterPlatform = s.altFilterPlatform || "";
       elements.altStation.value = appState.altStation;
+      elements.altCallingStation.value = appState.altCallingStation;
+      elements.altFilterPlatform.value = appState.altFilterPlatform;
 
       if (appState.busName.length) elements.busLongName.innerHTML = "Location: <b>" + appState.busName + "</b>";
 
@@ -816,7 +892,6 @@
       appState.callingStationSelected = true;
       appState.callingStation = item.name;
       appState.callingCrs = item.crsCode;
-      handleClearAltStation();
     }
 
     function handleAltStationSelected(item) {
@@ -825,8 +900,13 @@
       appState.altCrs = item.crsCode;
       appState.altLatitude = item.latitude;
       appState.altLongitude = item.longitude;
-      handleClearFilter();
       toggleAltSelectors();
+    }
+
+    function handleAltCallingStationSelected(item) {
+      appState.altCallingStationSelected = true;
+      appState.altCallingStation = item.name;
+      appState.altCallingCrs = item.crsCode;
     }
 
     function handleTfLStationSelected(item) {
@@ -862,6 +942,14 @@
       }
     }
 
+    function handleAltCallingStationLostFocus() {
+      if (!appState.altCallingStationSelected) {
+        elements.altCallingStation.value = appState.altCallingStation;
+      } else {
+        appState.altCallingStationSelected = false;
+      }
+    }
+
     function handleTfLStationLostFocus() {
       if (!appState.stationSelectedTfL) {
         elements.searchNameTfL.value = appState.tubeName;
@@ -877,6 +965,16 @@
       elements.callingStation.value = appState.callingStation;
     }
 
+    function handlePlatformInput() {
+      appState.filterPlatform = elements.filterPlatform.value.toUpperCase().trim();
+      elements.filterPlatform.value = appState.filterPlatform;
+    }
+
+    function handleClearPlatformFilter() {
+      appState.filterPlatform = "";
+      elements.filterPlatform.value = "";
+    }
+
     function handleClearAltStation() {
       appState.altCrs = "";
       appState.altStation = "";
@@ -885,6 +983,23 @@
       appState.altLongitude = 0;
       elements.altStation.value = appState.altStation;
       toggleAltSelectors();
+    }
+
+    function handleClearAltCallingFilter() {
+      appState.altCallingCrs = "";
+      appState.altCallingStation = "";
+      appState.altCallingStationSelected = false;
+      elements.altCallingStation.value = "";
+    }
+
+    function handleAltPlatformInput() {
+      appState.altFilterPlatform = elements.altFilterPlatform.value.toUpperCase().trim();
+      elements.altFilterPlatform.value = appState.altFilterPlatform;
+    }
+
+    function handleClearAltPlatformFilter() {
+      appState.altFilterPlatform = "";
+      elements.altFilterPlatform.value = "";
     }
 
     function handleBrightnessChange() {
@@ -903,6 +1018,7 @@
       s.lon = appState.stationLongitude;
       s.callingStation = appState.callingStation;
       s.callingCrs = appState.callingCrs;
+      s.filterPlatform = appState.filterPlatform;
       s.tubeId = appState.tubeId;
       s.tubeName = appState.tubeName;
       s.mode = appState.boardMode;
@@ -922,6 +1038,9 @@
       s.altLon = appState.altLongitude;
       s.altStarts = parseInt(elements.altStart.value);
       s.altEnds = parseInt(elements.altEnd.value);
+      s.altCallingStation = appState.altCallingStation;
+      s.altCallingCrs = appState.altCallingCrs;
+      s.altFilterPlatform = appState.altFilterPlatform;
       if (appState.busIdOK) {
         s.busName = appState.busName;
         s.busId = appState.busId;

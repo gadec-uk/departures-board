@@ -94,8 +94,9 @@ Once the ESP32 has established an Internet connection, the next step is to enter
 At start-up, the ESP32's IP address is displayed. To change the station or to configure other miscellaneous settings, open the web page at that address. The settings available are:
 - **Board Mode** - switch between National Rail Departures, London Underground Arrivals or UK Bus Stops modes (**firmware v1.8 or above**)
 - **Station** - start typing a few characters of a station name and select from the drop-down station picker displayed (National Rail mode).
-- **Only show services calling at** - filter services based on *calling at* location (National Rail mode - if you want to see the next trains *to* a particular station). Note this option cannot be combined with the *Alternate station* feature.
-- **Alternate station** - automatically switch to displaying an alternate station between the hours set here (National Rail mode).
+- **Only show services calling at** - filter services based on *calling at* location (National Rail mode - if you want to see the next trains *to* a particular station).
+- **Only show services on platform** - filter services to show only those departing from a specific platform (National Rail mode).
+- **Alternate station** - automatically switch to displaying an alternate station between the hours set here (National Rail mode). Each station can have its own independent filters.
 - **Underground Station** - start typing a few characters of an Underground or DLR station name and select from the drop-down station picker displayed (London Underground mode).
 - **Bus Stop ATCO code** - Type the ATCO number of the bus stop you want to monitor (see [below](#bus-stop-atco-codes) for details).
 - **Brightness** - adjusts the brightness of the OLED screen.

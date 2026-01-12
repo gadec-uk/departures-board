@@ -188,7 +188,7 @@ void raildataXmlClient::fixFullStop(char *input) {
 //
 // Updates the Departure Board data from the SOAP API
 //
-int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode) {
+int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platformFilter) {
 
     unsigned long perfTimer=millis();
     bool bChunked = false;
@@ -237,7 +237,7 @@ int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *message
     }
 
     int reqRows = MAXBOARDSERVICES;
-    if (callingCrsCode[0]) reqRows = 10;   // Request maximum services if we're filtering
+    if (callingCrsCode[0] || platformFilter[0]) reqRows = 10;   // Request maximum services if we're filtering
     String data = F("<soap-env:Envelope xmlns:soap-env=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap-env:Header><ns0:AccessToken xmlns:ns0=\"http://thalesgroup.com/RTTI/2013-11-28/Token/types\"><ns0:TokenValue>");
     data += String(customToken) + F("</ns0:TokenValue></ns0:AccessToken></soap-env:Header><soap-env:Body><ns0:GetDepBoardWithDetailsRequest xmlns:ns0=\"http://thalesgroup.com/RTTI/2021-11-01/ldb/\"><ns0:numRows>") + String(reqRows) + F("</ns0:numRows><ns0:crs>");
     data += String(crsCode) + F("</ns0:crs></ns0:GetDepBoardWithDetailsRequest></soap-env:Body></soap-env:Envelope>");
@@ -303,6 +303,13 @@ int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *message
         strcpy(filterCrs,"");
         filter=false;
     }
+    if (platformFilter[0]) {
+        strcpy(filterPlatform,platformFilter);
+        filterByPlatform=true;
+    } else {
+        strcpy(filterPlatform,"");
+        filterByPlatform=false;
+    }
     keepRoute=false;
 
     char c;
@@ -339,7 +346,26 @@ int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *message
         lastErrorMessage += F("Data incomplete - no location in response");
         return UPD_DATA_ERROR;
     }
-    if (filter && !keepRoute && xStation.numServices) xStation.numServices--;   // Last route added needs filtering out
+    
+    // Check if last service needs filtering out
+    if (xStation.numServices > 0) {
+        bool shouldRemoveLastService = false;
+        int lastId = xStation.numServices - 1;
+        
+        // Check calling point filter
+        if (filter && !keepRoute) {
+            shouldRemoveLastService = true;
+        }
+        // Check platform filter
+        if (filterByPlatform && xStation.service[lastId].platform[0] && 
+            strcmp(xStation.service[lastId].platform, filterPlatform) != 0) {
+            shouldRemoveLastService = true;
+        }
+        
+        if (shouldRemoveLastService) {
+            xStation.numServices--;
+        }
+    }
 
     sanitiseData();
     if (includeBusServices) {
@@ -570,25 +596,39 @@ void raildataXmlClient::value(const char *value)
         return;
     } else if (tagLevel == 8 && tagName == F("lt4:std")) {
         // Starting a new service
-        // If we're filtering on calling point, check if we need to keep the previous service (if there was one)
-        if (filter && !keepRoute && id>=0) {
-            // We don't want this service, so clear it
-            strcpy(xStation.service[id].sTime,"");
-            strcpy(xStation.service[id].destination,"");
-            strcpy(xStation.service[id].via,"");
-            strcpy(xStation.service[id].origin,"");
-            strcpy(xStation.service[id].etd,"");
-            strcpy(xStation.service[id].platform,"");
-            strcpy(xStation.service[id].opco,"");
-            strcpy(xStation.service[id].calling,"");
-            strcpy(xStation.service[id].serviceMessage,"");
-            xStation.service[id].trainLength=0;
-            xStation.service[id].classesAvailable=0;
-            xStation.service[id].serviceType=0;
-            xStation.service[id].isCancelled=false;
-            xStation.service[id].isDelayed=false;
-            xStation.numServices--;
-            id--;
+        // Check if we need to filter out the previous service (if there was one)
+        bool shouldRemoveService = false;
+        
+        if (id >= 0) {
+            // Check calling point filter
+            if (filter && !keepRoute) {
+                shouldRemoveService = true;
+            }
+            // Check platform filter
+            if (filterByPlatform && xStation.service[id].platform[0] && 
+                strcmp(xStation.service[id].platform, filterPlatform) != 0) {
+                shouldRemoveService = true;
+            }
+            
+            if (shouldRemoveService) {
+                // We don't want this service, so clear it
+                strcpy(xStation.service[id].sTime,"");
+                strcpy(xStation.service[id].destination,"");
+                strcpy(xStation.service[id].via,"");
+                strcpy(xStation.service[id].origin,"");
+                strcpy(xStation.service[id].etd,"");
+                strcpy(xStation.service[id].platform,"");
+                strcpy(xStation.service[id].opco,"");
+                strcpy(xStation.service[id].calling,"");
+                strcpy(xStation.service[id].serviceMessage,"");
+                xStation.service[id].trainLength=0;
+                xStation.service[id].classesAvailable=0;
+                xStation.service[id].serviceType=0;
+                xStation.service[id].isCancelled=false;
+                xStation.service[id].isDelayed=false;
+                xStation.numServices--;
+                id--;
+            }
         }
         keepRoute = false;  // reset for next route
         if (id>=0) {

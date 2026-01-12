@@ -325,9 +325,13 @@ float stationLat=0;                 // Selected station Latitude/Longitude (used
 float stationLon=0;
 char callingCrsCode[4] = "";        // Station code to filter routes on
 char callingStation[45] = "";       // Calling filter station friendly name
+char filterPlatform[4] = "";        // Platform filter
 char altCrsCode[4] = "";            // Station code of alternate station
 float altLat=0;                     // Alternate station Latitude/Longitude (used to get weather for the location)
 float altLon=0;
+char altCallingCrsCode[4] = "";     // Calling filter for alternate station
+char altCallingStation[45] = "";    // Calling filter station friendly name for alternate station
+char altFilterPlatform[4] = "";     // Platform filter for alternate station
 String tflAppkey = "";              // TfL API Key
 char tubeId[13] = "";               // Underground station naptan id
 String tubeName="";                 // Underground Station Name
@@ -510,7 +514,7 @@ void drawStartupHeading() {
   drawBuildTime();
 }
 
-void drawStationHeader(const char *stopName, const char *callingStopName) {
+void drawStationHeader(const char *stopName, const char *callingStopName, const char *platformFilter) {
 
   // Clear the top line
   if (boardMode == MODE_TUBE || boardMode == MODE_BUS) {
@@ -521,8 +525,18 @@ void drawStationHeader(const char *stopName, const char *callingStopName) {
 
   u8g2.setFont(NatRailSmall9);
   char boardTitle[95];
-  if (callingStopName[0]) snprintf(boardTitle,sizeof(boardTitle),"%s  (%c%s)",stopName,129,callingStopName);
-  else strncpy(boardTitle,stopName,sizeof(boardTitle));
+  
+  // Build the title with platform filter and calling station
+  if (platformFilter[0] && callingStopName[0]) {
+    snprintf(boardTitle,sizeof(boardTitle),"%s (%s) (%c%s)",stopName,platformFilter,129,callingStopName);
+  } else if (platformFilter[0]) {
+    snprintf(boardTitle,sizeof(boardTitle),"%s (%s)",stopName,platformFilter);
+  } else if (callingStopName[0]) {
+    snprintf(boardTitle,sizeof(boardTitle),"%s  (%c%s)",stopName,129,callingStopName);
+  } else {
+    strncpy(boardTitle,stopName,sizeof(boardTitle));
+  }
+  
   int boardTitleWidth = getStringWidth(boardTitle);
   int line4Y = (boardMode == MODE_RAIL) ? LINE4 : ULINE4;
 
@@ -569,7 +583,9 @@ void drawCurrentTime(bool update) {
     strcpy(displayedTime,sysTime);
     if (dateEnabled && timeinfo.tm_mday!=dateDay) {
       // Need to update the date on screen
-      drawStationHeader(station.location,callingStation);
+      const char* activeCallingStation = (altStationActive && altStationEnabled) ? altCallingStation : callingStation;
+      const char* activePlatformFilter = (altStationActive && altStationEnabled) ? altFilterPlatform : filterPlatform;
+      drawStationHeader(station.location,activeCallingStation,activePlatformFilter);
       if (update) u8g2.sendBuffer();  // Just refresh on new date
     }
   }
@@ -923,6 +939,7 @@ void loadConfig() {
         if (settings[F("crs")].is<const char*>())        strlcpy(crsCode, settings[F("crs")], sizeof(crsCode));
         if (settings[F("callingCrs")].is<const char*>()) strlcpy(callingCrsCode, settings[F("callingCrs")], sizeof(callingCrsCode));
         if (settings[F("callingStation")].is<const char*>()) strlcpy(callingStation, settings[F("callingStation")], sizeof(callingStation));
+        if (settings[F("filterPlatform")].is<const char*>()) strlcpy(filterPlatform, settings[F("filterPlatform")], sizeof(filterPlatform));
         if (settings[F("hostname")].is<const char*>())   strlcpy(hostname, settings[F("hostname")], sizeof(hostname));
         if (settings[F("wsdlHost")].is<const char*>())   strlcpy(wsdlHost, settings[F("wsdlHost")], sizeof(wsdlHost));
         if (settings[F("wsdlAPI")].is<const char*>())    strlcpy(wsdlAPI, settings[F("wsdlAPI")], sizeof(wsdlAPI));
@@ -955,6 +972,9 @@ void loadConfig() {
         if (settings[F("altEnds")].is<int>())            altEnds = settings[F("altEnds")];
         if (settings[F("altLat")].is<float>())           altLat = settings[F("altLat")];
         if (settings[F("altLon")].is<float>())           altLon = settings[F("altLon")];
+        if (settings[F("altCallingCrs")].is<const char*>()) strlcpy(altCallingCrsCode, settings[F("altCallingCrs")], sizeof(altCallingCrsCode));
+        if (settings[F("altCallingStation")].is<const char*>()) strlcpy(altCallingStation, settings[F("altCallingStation")], sizeof(altCallingStation));
+        if (settings[F("altFilterPlatform")].is<const char*>()) strlcpy(altFilterPlatform, settings[F("altFilterPlatform")], sizeof(altFilterPlatform));
 
         if (settings[F("busId")].is<const char*>())      strlcpy(busAtco, settings[F("busId")], sizeof(busAtco));
         if (settings[F("busName")].is<const char*>())    busName = String(settings[F("busName")]);
@@ -1176,7 +1196,11 @@ bool checkForFirmwareUpdate() {
 // Request a data update via the raildataClient
 bool getStationBoard() {
   if (!firstLoad) showUpdateIcon(true);
-  lastUpdateResult = raildata->updateDepartures(&station,&messages,crsCode,nrToken,MAXBOARDSERVICES,enableBus,callingCrsCode);
+  
+  const char* activeCallingCrs = (altStationActive && altStationEnabled) ? altCallingCrsCode : callingCrsCode;
+  const char* activePlatformFilter = (altStationActive && altStationEnabled) ? altFilterPlatform : filterPlatform;
+  
+  lastUpdateResult = raildata->updateDepartures(&station,&messages,crsCode,nrToken,MAXBOARDSERVICES,enableBus,activeCallingCrs,activePlatformFilter);
   nextDataUpdate = millis()+apiRefreshRate;
   if (lastUpdateResult == UPD_SUCCESS || lastUpdateResult == UPD_NO_CHANGE) {
     showUpdateIcon(false);
@@ -1313,7 +1337,9 @@ void drawStationBoard() {
     // Clear the top two lines
     blankArea(0,LINE0,256,LINE2-1);
   }
-  drawStationHeader(station.location,callingStation);
+  const char* activeCallingStation = (altStationActive && altStationEnabled) ? altCallingStation : callingStation;
+  const char* activePlatformFilter = (altStationActive && altStationEnabled) ? altFilterPlatform : filterPlatform;
+  drawStationHeader(station.location,activeCallingStation,activePlatformFilter);
 
   // Draw the primary service line
   isShowingVia=false;
@@ -1441,8 +1467,8 @@ void drawCurrentTimeUG(bool update) {
     u8g2.setFont(Underground10);
 
     if (dateEnabled && timeinfo.tm_mday!=dateDay) {
-      if (boardMode == MODE_TUBE) drawStationHeader(tubeName.c_str(),"");
-      else drawStationHeader(busName.c_str(),"");
+      if (boardMode == MODE_TUBE) drawStationHeader(tubeName.c_str(),"","");
+      else drawStationHeader(busName.c_str(),"","");
       if (update) u8g2.sendBuffer();  // Just refresh on new date
       u8g2.setFont(Underground10);
     }
@@ -1525,7 +1551,7 @@ void drawUndergroundBoard() {
       // Clear the top three lines
       blankArea(0,ULINE0,256,ULINE3-1);
   }
-  drawStationHeader(tubeName.c_str(),"");
+  drawStationHeader(tubeName.c_str(),"","");
 
   if (station.boardChanged) {
     // prepare to scroll up primary services
@@ -1640,7 +1666,7 @@ void drawBusDeparturesBoard() {
       // Clear the top three lines
       blankArea(0,ULINE0,256,ULINE3-1);
   }
-  drawStationHeader(busName.c_str(),"");
+  drawStationHeader(busName.c_str(),"","");
 
   if (station.boardChanged) {
     // prepare to scroll up primary services
@@ -1785,7 +1811,7 @@ void handleSaveKeys() {
         if (owmToken.length()) {
           // Check if this is a valid token...
           if (!currentWeather.updateWeather(owmToken, "51.52", "-0.13")) {
-            msg = F("OpenWeather Map API key is not valid. No changes have been saved.");
+            msg = F("OpenWeather Map API key is not valid. It may not yet be active if you have just created it. No changes have been saved.");
             result = false;
           }
         }
