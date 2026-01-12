@@ -98,6 +98,8 @@ At start-up, the ESP32's IP address is displayed. To change the station or to co
 - **Only show services calling at (alternate active)** - as above, but applies when the alternate station is active.
 - **Underground Station** - start typing a few characters of an Underground or DLR station name and select from the drop-down station picker displayed (London Underground mode).
 - **Bus Stop ATCO code** - Type the ATCO number of the bus stop you want to monitor (see [below](#bus-stop-atco-codes) for details).
+- **Only show these Bus services** - filter buses by service numbers (enter a list of the service numbers, comma separated).
+- **Recently verfied ATCO codes** - quickly select from recently used bus stop ATCO codes.
 - **Brightness** - adjusts the brightness of the OLED screen.
 - **Show the date on screen** - displays the date in the upper-right corner (useful if you're also using this as a desk clock!)
 - **Include Bus services** - optionally include bus replacement services (National Rail mode - shown with a small bus icon in place of platform number).
