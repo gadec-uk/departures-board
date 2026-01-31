@@ -97,6 +97,6 @@ class raildataXmlClient: public xmlListener {
         raildataXmlClient();
         int init(const char *wsdlHost, const char *wsdlAPI, rdCallback RDcb);
         void cleanFilter(const char* rawFilter, char* cleanedFilter, size_t maxLen);
-        int updateDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms);
+        int updateDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, int timeOffset, const char *callingCrsCode, const char *platforms);
         String getLastError();
 };
