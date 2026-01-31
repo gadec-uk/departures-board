@@ -180,8 +180,8 @@
           <div id="optNoScroll" class="checkbox" style="display:none">
             <label><input type="checkbox" id="noScrolling"> Suppress calling at / information messages</label>
           </div>
-          <div class="checkbox">
-            <label><input type="checkbox" id="optTimeOffset"> Use time offset</label>
+          <div id="optTimeOffset" class="checkbox" style="display:none">
+            <label><input type="checkbox" id="enableTimeOffset"> Use time offset</label>
           </div>
           <div id="timeOffsetBox" style="display:none;">
             <input id="timeOffset" type="number" min="-119" max="119" value="0" class="form-control input-md">
@@ -325,7 +325,7 @@
       busFilter: document.getElementById("busFilter"),
       clearHistoryButton: document.getElementById("clearHistory"),
       busAtcoHistoryList: document.getElementById("busAtcoHistoryList"),
-      optTimeOffset: document.getElementById("optTimeOffset"),
+      enableTimeOffset: document.getElementById("enableTimeOffset"),
       timeOffset: document.getElementById("timeOffset"),
       optFlip: document.getElementById("optFlip"),
       optTZ: document.getElementById("optTZ"),
@@ -673,7 +673,7 @@
     elements.busAtcoHistoryList.addEventListener('change', handleAtcoHistorySelect);
     elements.busFilter.addEventListener("blur", validateBusFilter);
     elements.optTZ.addEventListener("change", () => {show("customTZbox",isChecked("optTZ")); if (!isChecked("optTZ")) {elements.customTZ.value = ""; appState.tzOK=true;}});
-    elements.optTimeOffset.addEventListener("change", () => show("timeOffsetBox",isChecked("optTimeOffset")));
+    elements.enableTimeOffset.addEventListener("change", () => show("timeOffsetBox",isChecked("enableTimeOffset")));
     elements.customTZ.addEventListener("blur",validateTZ);
     elements.optHost.addEventListener("change", () => {show("customHostbox",isChecked("optHost")); if (!isChecked("optHost")) {elements.customHost.value = ""; appState.hostnameOK=true;}});
     elements.customHost.addEventListener("blur",validateHostname);
@@ -819,6 +819,9 @@
         show("optNoScroll", rail || tube);
         show("nrInvalidToken", mode === 0 && !appState.validNatRailToken);
 
+        show("optTimeOffset", rail);
+        show("timeOffsetBox", rail && isChecked("enableTimeOffset"));
+
         show("tflT", tube);
         show("tflSearchBox", tube);
         show("tflAtt", tube);
@@ -921,7 +924,7 @@
       show("customHostbox", elements.customHost.value.length);
 
       elements.timeOffset.value = s.timeOffset || 0;
-      setCheckbox("optTimeOffset", elements.timeOffset.value != 0);
+      setCheckbox("enableTimeOffset", elements.timeOffset.value != 0);
       show("timeOffsetBox", elements.timeOffset.value != 0);
 
       setCheckbox("enableSleep", s.sleep);
@@ -1067,7 +1070,7 @@
     async function handleSave() {
       const s = appState.jsonSettings;
       if ((s.hostname || "") != elements.customHost.value.trim()) appState.needRestart = true;
-      if (!isChecked("optTimeOffset")) elements.timeOffset.value = "0";
+      if (!isChecked("enableTimeOffset")) elements.timeOffset.value = "0";
       if (!isChecked("optTZ")) elements.customTZ.value = "";
       s.station = appState.stationName;
       s.crs = appState.stationCRS;
