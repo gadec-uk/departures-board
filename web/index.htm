@@ -181,6 +181,13 @@
             <label><input type="checkbox" id="noScrolling"> Suppress calling at / information messages</label>
           </div>
           <div class="checkbox">
+            <label><input type="checkbox" id="optTimeOffset"> Use time offset</label>
+          </div>
+          <div id="timeOffsetBox" style="display:none;">
+            <input id="timeOffset" type="number" min="-119" max="119" value="0" class="form-control input-md">
+            <span class="help-block">Enter a time offset between -120 and 120 (exclusive) in minutes.</span>
+          </div>
+          <div class="checkbox">
             <label><input type="checkbox" id="optFlip"> Flip the display 180&deg;</label>
           </div>
           <div class="checkbox">
@@ -318,6 +325,8 @@
       busFilter: document.getElementById("busFilter"),
       clearHistoryButton: document.getElementById("clearHistory"),
       busAtcoHistoryList: document.getElementById("busAtcoHistoryList"),
+      optTimeOffset: document.getElementById("optTimeOffset"),
+      timeOffset: document.getElementById("timeOffset"),
       optFlip: document.getElementById("optFlip"),
       optTZ: document.getElementById("optTZ"),
       customTZ: document.getElementById("customTZ"),
@@ -664,6 +673,7 @@
     elements.busAtcoHistoryList.addEventListener('change', handleAtcoHistorySelect);
     elements.busFilter.addEventListener("blur", validateBusFilter);
     elements.optTZ.addEventListener("change", () => {show("customTZbox",isChecked("optTZ")); if (!isChecked("optTZ")) {elements.customTZ.value = ""; appState.tzOK=true;}});
+    elements.optTimeOffset.addEventListener("change", () => show("timeOffsetBox",isChecked("optTimeOffset")));
     elements.customTZ.addEventListener("blur",validateTZ);
     elements.optHost.addEventListener("change", () => {show("customHostbox",isChecked("optHost")); if (!isChecked("optHost")) {elements.customHost.value = ""; appState.hostnameOK=true;}});
     elements.customHost.addEventListener("blur",validateHostname);
@@ -910,6 +920,10 @@
       setCheckbox("optHost", elements.customHost.value.length);
       show("customHostbox", elements.customHost.value.length);
 
+      elements.timeOffset.value = s.timeOffset || 0;
+      setCheckbox("optTimeOffset", elements.timeOffset.value != 0);
+      show("timeOffsetBox", elements.timeOffset.value != 0);
+
       setCheckbox("enableSleep", s.sleep);
       setCheckbox("showDate", s.showDate);
       setCheckbox("enableBuses", s.showBus);
@@ -1053,6 +1067,8 @@
     async function handleSave() {
       const s = appState.jsonSettings;
       if ((s.hostname || "") != elements.customHost.value.trim()) appState.needRestart = true;
+      if (!isChecked("optTimeOffset")) elements.timeOffset.value = "0";
+      if (!isChecked("optTZ")) elements.customTZ.value = "";
       s.station = appState.stationName;
       s.crs = appState.stationCRS;
       s.lat = appState.stationLatitude;
@@ -1071,6 +1087,7 @@
       s.weather = isChecked("enableWeather");
       s.fastRefresh = isChecked("enableFastRefresh");
       s.noScroll = isChecked("noScrolling");
+      s.timeOffset = parseInt(elements.timeOffset.value)
       s.flip = isChecked("optFlip");
       s.sleepStarts = parseInt(elements.sleepStart.value);
       s.sleepEnds = parseInt(elements.sleepEnd.value);

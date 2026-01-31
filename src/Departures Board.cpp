@@ -318,6 +318,7 @@ bool altStationActive = false;      // Is the alternate station currently shown
 byte altStarts = 12;                // Hour at which to switch to the alternate station
 byte altEnds = 23;                  // Hour at which to switch back to the default station
 bool noScrolling = false;           // Suppress all horizontal scrolling
+int timeOffset = 0;                 // Time offset for departures
 bool flipScreen = false;            // Rotate screen 180deg
 String timezone = "";               // custom (non UK) timezone for the clock
 bool apiKeys = false;               // Does apikeys.json exist?
@@ -993,6 +994,7 @@ void loadConfig() {
         if (settings[F("busFilter")].is<const char*>())  strlcpy(busFilter, settings[F("busFilter")], sizeof(busFilter));
 
         if (settings[F("noScroll")].is<bool>())          noScrolling = settings[F("noScroll")];
+        if (settings[F("timeOffset")].is<int>())         timeOffset = settings[F("timeOffset")];
         if (settings[F("flip")].is<bool>())              flipScreen = settings[F("flip")];
         if (settings[F("TZ")].is<const char*>())         timezone = settings[F("TZ")].as<String>();
       } else {
@@ -1224,7 +1226,7 @@ bool checkForFirmwareUpdate() {
 // Request a data update via the raildataClient
 bool getStationBoard() {
   if (!firstLoad) showUpdateIcon(true);
-  lastUpdateResult = raildata->updateDepartures(&station,&messages,crsCode,nrToken,MAXBOARDSERVICES,enableBus,callingCrsCode,cleanPlatformFilter);
+  lastUpdateResult = raildata->updateDepartures(&station,&messages,crsCode,nrToken,MAXBOARDSERVICES,enableBus,timeOffset,callingCrsCode,cleanPlatformFilter);
   nextDataUpdate = millis()+apiRefreshRate;
   if (lastUpdateResult == UPD_SUCCESS || lastUpdateResult == UPD_NO_CHANGE) {
     showUpdateIcon(false);

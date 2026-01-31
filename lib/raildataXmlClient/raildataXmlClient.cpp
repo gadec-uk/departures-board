@@ -256,7 +256,7 @@ void raildataXmlClient::cleanFilter(const char* rawFilter, char* cleanedFilter, 
 //
 // Updates the Departure Board data from the SOAP API
 //
-int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms) {
+int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, int timeOffset, const char *callingCrsCode, const char *platforms) {
 
     unsigned long perfTimer=millis();
     bool bChunked = false;
@@ -312,6 +312,7 @@ int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *message
     if (callingCrsCode[0]) {
         data += "<ns0:filterCrs>" + String(callingCrsCode) + F("</ns0:filterCrs><ns0:filterType>to</ns0:filterType>");
     }
+    data += "<ns0:timeOffset>" + String(timeOffset) + F("</ns0:timeOffset>");
     data += F("</ns0:GetDepBoardWithDetailsRequest></soap-env:Body></soap-env:Envelope>");
 
     httpsClient.print("POST " + String(soapAPI) + F(" HTTP/1.1\r\n") +
