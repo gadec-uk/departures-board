@@ -5,7 +5,7 @@ This is an ESP32 based mini Departures Board replicating those at many UK railwa
 A model railway (00 gauge) version of this project is also available [here](https://github.com/gadec-uk/tiny-departures-board).
 
 ## Features
-* All processing is done onboard by the ESP32 processor
+* All processing is done onboard by the ESP32 processor, no middleware servers
 * Smooth animation matching the real departures and arrivals boards
 * Displays up to the next 9 departures with scheduled time, platform number, destination, calling stations and expected departure time
 * Optionally only show services calling at a selected railway station
@@ -15,6 +15,7 @@ A model railway (00 gauge) version of this project is also available [here](http
 * Displays up to the next 9 arrivals with time to station (London Underground mode)
 * TfL station and network service messages (London Underground mode)
 * In Bus mode, displays up to the next 9 departures with service number, destination, vehicle registration and schedule/expected time
+* Optionally display RSS headline feeds with UK news, sports and rail news
 * Fully-featured browser based configuration screens - choose any station on the UK network / London Tube & DLR network / UK Bus Stops
 * Automatic firmware updates (optional)
 * Displays the weather at the selected location (optional)
@@ -107,13 +108,19 @@ At start-up, the ESP32's IP address is displayed. To change the station or to co
 - **Show the date on screen** - displays the date in the upper-right corner (useful if you're also using this as a desk clock!)
 - **Include bus replacement services** - optionally include bus replacement services (National Rail mode - shown with a small bus icon in place of platform number).
 - **Include current weather at station location** - this option requires a valid OpenWeather Map API key (National Rail/Bus mode).
-- **Increase API refresh rate** - Reduces the interval between data refreshes (National Rail mode). Uses more data and is not usually required.
-- **Suppress calling at / information messages** - removes all horizontally scrolling text (much lower functionality but less distracting).
-- **Flip the display 180°** - Rotates the display (the case design provides two different viewing angles depending on orientation).
-- **Set custom hostname for this board** - change the hostname from the default "DeparturesBoard", useful if you are running multiple boards.
-- **Custom (non-UK) time zone (only for clock)** - if you're not based in the UK you can set the clock to display in your local time zone (see [below](#custom-time-zones) for details).
-- **Enable automatic firmware updates at startup** - automatically checks for AND installs the latest firmware from this repository.
+- **Show platform numbers if available** - deselecting this option will hide platform numbers (National Rail).
+- **Enable automatic firmware updates at startup** - automatically checks for AND installs the latest firmware from this repository when the system starts up.
+- **Enable daily check for firmware updates** - when enabled, the system will check for and install any updates just after midnight if the board is powered on.
 - **Enable overnight sleep mode (screensaver)** - if you're running the board 24/7, you can help prevent screen burn-in by enabling this option overnight.
+- ***Flip the display 180°** - Rotates the display (the case design provides two different viewing angles depending on orientation).
+- ***Set custom hostname for this board** - change the hostname from the default "DeparturesBoard", useful if you are running multiple boards.
+- ***Custom (non-UK) time zone (only for clock)** - if you're not based in the UK you can set the clock to display in your local time zone (see [below](#custom-time-zones) for details).
+- ***Suppress calling at / information messages** - removes all horizontally scrolling text (much lower functionality but less distracting).
+- ***Increase API refresh rate** - Reduces the interval between data refreshes (National Rail mode). Uses more data and is not usually required.
+- ***Display RSS news headlines feed** - Displays the top headlines from the selected feed after any other service messages (Rail/Tube mode).
+- ***Display departures offset by** - Displays future (or past) services offset by the selected time. This does not affect the clock display (Rail mode).
+
+Items marked * are on the *Advanced Options* tab.
 
 A drop-down menu (top-right) adds the following options:
 - **Check for Updates** - manually checks for and installs any updates to the firmware.

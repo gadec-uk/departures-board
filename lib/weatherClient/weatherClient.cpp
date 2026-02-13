@@ -17,6 +17,7 @@ weatherClient::weatherClient() {}
 
 bool weatherClient::updateWeather(String apiKey, String lat, String lon) {
 
+    unsigned long perfTimer = millis();
     lastErrorMsg = "";
 
     JsonStreamingParser parser;
@@ -42,7 +43,7 @@ bool weatherClient::updateWeather(String apiKey, String lat, String lon) {
     if (!httpClient.available()) {
         // no response within 8 seconds so exit
         httpClient.stop();
-        lastErrorMsg += F("Response timeout");
+        lastErrorMsg += F("Response timeout (GET)");
         return false;
     }
 
@@ -86,9 +87,9 @@ bool weatherClient::updateWeather(String apiKey, String lat, String lon) {
         return false;
     }
 
-    lastErrorMsg="";
+    lastErrorMsg="Success - took " + String(millis()-perfTimer) + F("ms");
 
-    currentWeather = description + " " + String((int)round(temperature)) + F("\x80 Wind: ") + String((int)round(windSpeed)) + F("mph");
+    currentWeather = description + " " + String((int)round(temperature)) + F("\xB0 Wind: ") + String((int)round(windSpeed)) + F("mph");
     return true;
 }
 

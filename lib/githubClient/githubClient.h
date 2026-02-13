@@ -19,7 +19,7 @@ class github: public JsonListener {
 
     private:
         const char* apiHost = "api.github.com";
-        const char* apiGetLatestRelease = "/repos/gadec-uk/departures-board/releases/latest";
+        String apiGetLatestRelease = "/repos/gadec-uk/departures-board/releases/latest";
         String currentKey = "";
         String currentArray = "";
         String currentObject = "";
@@ -39,7 +39,7 @@ class github: public JsonListener {
         String releaseAssetURL[MAX_RELEASE_ASSETS];
         String releaseAssetName[MAX_RELEASE_ASSETS];
 
-        github(String token);
+        github(String repository, String token);
 
         bool getLatestRelease();
         //bool downloadAssetToLittleFS(String url, String filename);

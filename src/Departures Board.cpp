@@ -20,7 +20,7 @@
 
 // Release version number
 #define VERSION_MAJOR 2
-#define VERSION_MINOR 1
+#define VERSION_MINOR 2
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -39,9 +39,11 @@
 #include <TfLdataClient.h>
 #include <busDataClient.h>
 #include <githubClient.h>
+#include <rssClient.h>
 #include <webgui/webgraphics.h>
 #include <webgui/index.h>
 #include <webgui/keys.h>
+#include <webgui/rssfeeds.h>
 #include <gfx/xbmgfx.h>
 
 #include <time.h>
@@ -144,39 +146,48 @@ U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI u8g2(U8G2_R0, /* cs=*/ 26, /* dc=*/ 5, /* re
 //
 // Custom fonts - replicas of those used on the real display boards
 //
-static const uint8_t NatRailSmall9[997] U8G2_FONT_SECTION("NatRailSmall9") =
-  "c\0\3\2\3\4\2\5\5\7\11\0\0\11\0\11\2\1\71\2r\3\314 \5\0\63\5!\7\71\245"
-  "\304\240\4\42\7\33-Eb\11#\16=\245M)I\6\245\62(\245$\1$\14=\245U\266\324\266"
-  "$\331\42\0%\14<eE\244H\221\24)R\0&\15=\245\215T\222\222DJ\242H\11'\6\31"
-  "\255\304\0(\10;%UR\252\25)\11;%EV\252\224\0*\12-\247ERY,K\3+\12"
-  "-\247U\30\15R\30\1,\7\32\341L\242\0-\6\13+\305\0.\6\11\245D\0/\13<e]"
-  "$ER$e\0\60\12=\245\315\222yK\26\0\61\10\273\245M\42u\31\62\12=\245\315\222\205Y"
-  "\333 \63\14=\245\315\222\205\221\252%\13\0\64\14=\245]&%\245d\320\302\4\65\13=\245\305q"
-  "HC-Y\0\66\14=\245\315\222\211C\222i\311\2\67\12=\245\305 f\305&\0\70\14=\245\315"
-  "\222i\311\222i\311\2\71\14=\245\315\222i\311\20j\311\2:\6!\247D\24;\7*\345L\252\0"
-  "<\10<e]\324\330\0=\10\34i\305\20\16\1>\10<eE\330\324\6?\14=\245\315\222\205\221"
-  "\226C\21\0@\14=\245\315\222Y\22eH\27\0A\13=\245\315\222i\303\220\331\2B\15=\245\305"
-  "\220d\332\240d\332\240\0C\12=\245\315\222\211m\311\2D\12=\245\305\220d\336\6\5E\13=\245"
-  "\305\61\34\222\60\34\4F\12=\245\305\61\34\222\260\10G\14=\245\315\222\211\311\220i\311\2H\12="
-  "\245Ef\33\206\314\26I\10;%\305\22u\31J\11=\245eG-Y\0K\15=\245E&%%"
-  "-\211*Y\0L\10=\245E\330\343 M\12=\245E\266,\211\346\26N\13=\245E\66)\211\264"
-  "\331\2O\12=\245\315\222yK\26\0P\14=\245\305\220d\332\240\204E\0Q\12M\241\315\222yK"
-  "\306\64R\15=\245\305\220d\332\240\224*Y\0S\13=\245\315\222\251\253\226,\0T\11=\245\305 "
-  "\205=\1U\11=\245E\346[\262\0V\12=\245E\346-\251E\0W\12=\245E\346\222(\311-"
-  "X\13=\245E\246%\265JM\13Y\12=\245E\246%\265\260\11Z\12=\245\305 f\35\7\1["
-  "\7:\345\304\322E\134\12<eE\246eZ\246\5]\7:e\206\322e^\6\23/M\3_\6\14"
-  "c\305\20`\6\22\357D\24a\12-\245\315\232\14Z\62\4b\13=\245EX\61i\332\240\0c\11"
-  "-\245\315 V\207\0d\12=\245e\305\264i\311\20e\12-\245\315\222\15C:\4f\12<eU"
-  "\245\64e%\0g\14=\241\315\240\331\222!\34\24\0h\12=\245EX\61i\266\0i\10;%M"
-  "(\265\14j\13La]\16dmR\242\0k\13<eEVR\22))\5l\10;%\205\324\313"
-  "\0m\12-\245M\27%\321\264\0n\11-\245Eb\322l\1o\11-\245\315\222\331\222\5p\14="
-  "\241\305\220d\266A\11C\0q\12=\241\315\240\331\222!,r\11-\245Eb\22\213\0s\11-\245"
-  "\315\240\36\24\0t\12<eM\26\15IV\24u\11-\245E\346\244(\1v\12-\245EfKj"
-  "\21\0w\13-\245E\246$J\242t\1x\12-\245E\226\324*\265\0y\13=\241E\346\226\14\341"
-  "\240\0z\11-\245\305\240\265\15\2{\17G#\206\266,=E\26\65\311\222d\11|\6\71\245\304!"
-  "}\6\15\253\305 ~\15>\345\315\220\204\306\341!\211\22\0\15=\245E\222U\212Q\22%J\1"
-  "\200\11$k\215\22I\211\2\201\14\265%^\62hQ\66(\31\0\202\14=\345\305iI\64eH\206"
-  "A\0\0\0";
+static const uint8_t NatRailSmall9[1292] U8G2_FONT_SECTION("NatRailSmall9") =
+  "\221\0\3\2\3\4\4\5\5\11\11\0\0\11\0\11\2\1@\2\207\4\363 \5\0\314\24!\7\71\224"
+  "\22\203\22\42\7\33\264\24\211%#\16=\224\66\245$\31\224\312\240\224\222\4$\14=\224V\331R\333"
+  "\222d\213\0%\14<\224\25\221\42ER\244H\1&\15=\224\66RIJ\22)\211\42%'\6\31"
+  "\264\22\3(\10;\224TI\251V)\11;\224\24Y\251R\2*\12-\234\26Ie\261,\15+\12"
+  "-\234Va\64Ha\4,\7\32\204\63\211\2-\6\13\254\24\3.\6\11\224\22\1/\13<\224u"
+  "\221\24I\221\224\1\60\12=\224\66K\346-Y\0\61\10\273\224\66\211\324e\62\13=\224\66K\26f"
+  "m\203\0\63\14=\224\66K\26F\252\226,\0\64\15=\224v\231\224\224\222A\13\23\0\65\13=\224"
+  "\26\307!\15\265d\1\66\15=\224\66K&\16I\246%\13\0\67\12=\224\26\203\230\25\233\0\70\15"
+  "=\224\66K\246%K\246%\13\0\71\15=\224\66K\246%C\250%\13\0:\7!\234\22Q\0;"
+  "\7*\224\63\251\2<\10<\224uQc\3=\10\34\244\25C\70\4>\11<\224\25aS\33\0?"
+  "\14=\224\66K\26FZ\16E\0@\14=\224\66KfI\224!]\0A\13=\224\66K\246\15C"
+  "f\13B\15=\224\26C\222i\203\222i\203\2C\13=\224\66K&\266%\13\0D\13=\224\26C"
+  "\222y\33\24\0E\13=\224\26\307pH\302p\20F\13=\224\26\307pH\302\42\0G\15=\224\66"
+  "K&&C\246%\13\0H\13=\224\26\231m\30\62[\0I\10;\224\24K\324eJ\11=\224\226"
+  "\35\265d\1K\15=\224\26\231\224\224\264$\252d\1L\11=\224\26a\217\203\0M\13=\224\26\331"
+  "\262$\232[\0N\13=\224\26\331\244$\322f\13O\12=\224\66K\346-Y\0P\14=\224\26C"
+  "\222i\203\22\26\1Q\13M\204\66K\346-\31\323\0R\15=\224\26C\222i\203R\252d\1S\13"
+  "=\224\66K\246\256Z\262\0T\11=\224\26\203\24\366\4U\11=\224\26\231o\311\2V\12=\224\26"
+  "\231\267\244\26\1W\13=\224\26\231K\242$\267\0X\13=\224\26\231\226\324*\65-Y\13=\224\26"
+  "\231\226\324\302&\0Z\12=\224\26\203\230u\34\4[\10:\224\23K\27\1\134\12<\224\25\231\226i"
+  "\231\26]\10:\224\31J\227\1^\6\23\274\64\15_\7\14\214\25C\0`\7\22\274\23Q\0a\12"
+  "-\224\66k\62h\311\20b\13=\224\26a\305\244i\203\2c\11-\224\66\203X\35\2d\13=\224"
+  "\226\25\323\246%C\0e\12-\224\66K\66\14\351\20f\12<\224U\225\322\224\225\0g\14=\204\66"
+  "\203fK\206pP\0h\12=\224\26a\305\244\331\2i\10;\224\64\241\324\62j\13L\204u\71\220"
+  "\265I\211\2k\13<\224\25YII\244\244\24l\10;\224\24R/\3m\12-\224\66]\224D\323"
+  "\2n\11-\224\26\211I\263\5o\12-\224\66KfK\26\0p\14=\204\26C\222\331\6%\14\1"
+  "q\13=\204\66\203fK\206\260\0r\11-\224\26\211I,\2s\11-\224\66\203zP\0t\12<"
+  "\224\65Y\64$YQu\11-\224\26\231\223\242\4v\12-\224\26\231-\251E\0w\13-\224\26\231"
+  "\222(\211\322\5x\12-\224\26YR\253\324\2y\13=\204\26\231[\62\204\203\2z\11-\224\26\203"
+  "\326\66\10{\12;\224TI\224dQ\26|\7\71\224\22\207\0}\13;\224\24Y\224%Q\22\1~"
+  "\7\25\254\66\246\4\15=\224\26IV)FI\224(\5\200\5\0\204\20\201\14\265\224x\311\240E"
+  "\331\240d\0\202\7\42\204\63\25\5\203\5\0\204\20\204\11$\204\65\275(\11\0\205\7\15\224\26I\1"
+  "\206\15>\224\67C\22\32\207\207$J\0\207\5\0\204\20\210\5\0\204\20\211\5\0\204\20\212\5\0\204"
+  "\20\213\5\0\204\20\214\5\0\204\20\215\15=\224\27\247%\321\224!\31\6\1\216\5\0\204\20\217\14?"
+  "\224\30oSdQ\267\341\0\220\6\33\247\37\17\221\7\32\264\23I\24\222\7\32\264\63\211\2\223\10\34"
+  "\264\25IS\22\224\10\34\264\65-J\2\225\6\33\244\24\17\226\7\15\254\26\203\0\227\5\0\204\20\230"
+  "\5\0\204\20\231\5\0\204\20\232\5\0\204\20\233\5\0\204\20\234\5\0\204\20\235\5\0\204\20\236\5\0"
+  "\204\20\237\5\0\204\20\240\5\0\204\20\241\5\0\204\20\242\5\0\204\20\243\14=\224VR%\33\242\60"
+  "\33\4\244\5\0\204\20\245\5\0\204\20\246\5\0\204\20\247\5\0\204\20\250\5\0\204\20\251\5\0\204\20"
+  "\252\5\0\204\20\253\5\0\204\20\254\5\0\204\20\255\5\0\204\20\256\5\0\204\20\257\5\0\204\20\260\12"
+  "$\254\65J$%\12\0\0\0\0";
 
 static uint8_t NatRailTall12[1064] U8G2_FONT_SECTION("NatRailTall12") =
   "a\0\3\2\4\4\2\5\5\11\14\0\375\11\375\11\0\1Q\2\235\4\17 \5\0\346\12!\7\221B"
@@ -229,41 +240,41 @@ static const uint8_t NatRailClockLarge9[177] U8G2_FONT_SECTION("NatRailClockLarg
   "\201\234\252Ur\32\1\70\17\231T\307\205\24+\211\13)V\22\27\0\71\20\231T\307\205\24+\211\203"
   "\70\71*\211\13\0:\7r\235\2\31\1\0\0\0";
 
-static const uint8_t Underground10[1072] U8G2_FONT_SECTION("Underground10") =
-"`\0\3\2\3\4\3\5\5\7\12\0\377\11\377\11\0\1Y\2\300\4\27 \5\0\346\12!\7IB"
-"\211C\22\42\7\23^\212D\11#\21MB\233R\222\14J)\211\222dPJI\2$\17MB\253"
-"l)%\331\226DI\262E\0%\12MB\313i\312:\35\1&\17F\302\33-j\323\242DK\242"
-"$\221\2'\10\42\326\211!Q\0(\10J\302\31\245O\1)\11J\302\211(\351E\1*\14=F"
-"\253J\345\240,M\21\0+\12-J\253\60\32\244\60\2,\10\42\276\211!Q\0-\6\15R\213A"
-".\6\22\302\211!/\10?\306\353\264\317\0\60\14N\302\233!\11\375\230\14\11\0\61\7J\303\233\245"
-"\37\62\13N\302\233!\11\323b\307a\63\16N\302\233!\11\323\322\234\212\311\220\0\64\16N\302\313P"
-"K\242J\226\14cZ\1\65\16N\302\213C\232\16r\232\212\311\220\0\66\17N\302\233!\11\325tP"
-"Bc\62$\0\67\11N\302\213k\261\327\24\70\17N\302\233!\11\215\311\220\204\306dH\0\71\17N"
-"\302\233!\11\215\311\240\246b\62$\0:\10\62\306\211!\34\2;\11:\302\211!T\24\0<\10<"
-"\306\272\250\261\1=\10\34\316\212!\34\2>\10<\306\212\260\251\15?\15MB\233%\323\302\254\230C"
-"\21\0@\16MB\233%\263$J\242\14a\272\0A\14N\302\233!\11\215\303 :\6B\15N\302"
-"\213A\11\215\303\22\32\207\5C\14N\302\233!\11\325\36\223!\1D\13N\302\213A\11\375\70,\0"
-"E\14N\302\213CZ\35\206\264:\14F\13N\302\213CZ\35\206\264\25G\16N\302\233!\11\325\312"
-" \32\223!\1H\13N\302\213\320q\30D\307\0I\11KB\212%\352\313\0J\12MB\313\36\65"
-"-Y\0K\20N\302\213PK\242J&&YTK\302\0L\11N\302\213\264_\207\1M\16OB"
-"\214t[*R$E\252k\0N\15N\302\213P\334\224HJ\264\321\30O\14N\302\233!\11\375\230"
-"\14\11\0P\14N\302\213A\11\215\303\222\266\2Q\14V\276\233!\11\375\224$C\34R\16N\302\213"
-"A\11\215\303R\213jI\30S\17N\302\233!\11\325x\210S\61\31\22\0T\12OB\214C\26\367"
-"\33\0U\12N\302\213\320\37\223!\1V\14OB\214\324\327$\253\244\31\0W\16OB\214\324S$"
-"ER\244tK\0X\16OB\214TM\262JZ\311*\251\32Y\14OB\214\64\311*i\334\33\0"
-"Z\13OB\214C\234\366y\30\2[\10J\302\211\245/\2\134\11MB\213\260\332\261\0]\10J\302"
-"\11\245/\3^\6\23^\232\6_\6\15>\213A`\7\42\326\211A\12a\13\65F\233\65\31\64-"
-"\31\2b\14EF\213\60\34\222\314mP\0c\12\65F\233%\23k\311\2d\13EF\313\312\240\271"
-"%C\0e\14\65F\233%\33\206\60K\26\0f\13L\302*%\213\246\254\23\0g\14E>\233%"
-"sK\206\60Y\0h\13MB\213\60\34\222\314\267\0i\7AF\211d\30j\11S>\252\64\352i"
-"\1k\15EF\213\260\224\224\264$\252d\1l\10CF\212\250o\2m\16\67F\214E\211\42)\222"
-"\42)\222\12n\11\65F\213!\311\274\5o\12\65F\233%sK\26\0p\14E>\213!\311\334\6"
-"%\14\1q\13E>\233%sK\206\260\0r\12\64\306\212d\210\262\66\0s\12\65F\233%]\265"
-"d\1t\12D\306\232,\32\222\254Qu\11\65F\213\314[\62\4v\12\65F\213\314-\251E\0w"
-"\13\67F\214\324)R\272%\0x\13\65F\213,\251\205YR\13y\13E>\213\314[\62\204\203\2"
-"z\12\65F\213A+f\331 {\21OB\234,\321\226\245\247\310\242&Y\222,\1|\6IB\213"
-"\7}\14\265\312\273d\320\242lP\62\0~\21N\302\233!\31\206P\34\36\24e\30\222(\1\16"
-"N\302\213$\314\224(\315\222,\351?\0\0\0";
+static const uint8_t Underground10[1085] U8G2_FONT_SECTION("Underground10") =
+  "b\0\3\2\3\4\4\5\5\11\12\0\377\11\377\11\0\1^\2\310\4$ \5\0\314\25!\7I\204"
+  "\22\207$\42\7\23\274\24\211\22#\21M\204\66\245$\31\224R\22%\311\240\224\222\4$\17M\204V"
+  "\331RJ\262-\211\222d\213\0%\12M\204\226\323\224u:\2&\17F\204\67Z\324\246E\211\226D"
+  "I\42\5'\10\42\254\23C\242\0(\10J\204\63J\237\2)\11J\204\23Q\322\213\2*\14=\214"
+  "V\225\312AY\232\42\0+\12-\224Va\64Ha\4,\10\42|\23C\242\0-\7\15\244\26\203"
+  "\0.\7\22\204\23C\0/\10?\214\327i\237\1\60\14N\204\67C\22\372\61\31\22\0\61\7J\205"
+  "\67K?\62\14N\204\67C\22\246\305\216\303\0\63\16N\204\67C\22\246\245\71\25\223!\1\64\16N"
+  "\204\227\241\226D\225,\31\306\264\2\65\16N\204\27\207\64\35\344\64\25\223!\1\66\17N\204\67C\22"
+  "\252\351\240\204\306dH\0\67\12N\204\27\327b\257)\0\70\17N\204\67C\22\32\223!\11\215\311\220"
+  "\0\71\17N\204\67C\22\32\223AM\305dH\0:\10\62\214\23C\70\4;\11:\204\23C\250("
+  "\0<\10<\214uQc\3=\10\34\234\25C\70\4>\11<\214\25aS\33\0?\15M\204\66K"
+  "\246\205Y\61\207\42\0@\16M\204\66KfI\224D\31\302t\1A\14N\204\67C\22\32\207At"
+  "\14B\16N\204\27\203\22\32\207%\64\16\13\0C\14N\204\67C\22\252=&C\2D\13N\204\27"
+  "\203\22\372qX\0E\14N\204\27\207\264:\14iu\30F\14N\204\27\207\264:\14i+\0G\16"
+  "N\204\67C\22\252\225A\64&C\2H\13N\204\27\241\343\60\210\216\1I\11K\204\24K\324\227\1"
+  "J\12M\204\226=jZ\262\0K\20N\204\27\241\226D\225LL\262\250\226\204\1L\11N\204\27i"
+  "\277\16\3M\16O\204\30\351\266T\244H\212T\327\0N\15N\204\27\241\270)\221\224h\243\61O\14"
+  "N\204\67C\22\372\61\31\22\0P\14N\204\27\203\22\32\207%m\5Q\14V|\67C\22\372)I"
+  "\206\70R\16N\204\27\203\22\32\207\245\26\325\222\60S\17N\204\67C\22\252\361\20\247b\62$\0T"
+  "\12O\204\30\207,\356\67\0U\12N\204\27\241?&C\2V\14O\204\30\251\257IVI\63\0W"
+  "\16O\204\30\251\247H\212\244H\351\226\0X\16O\204\30\251\232d\225\264\222UR\65Y\14O\204\30"
+  "i\222U\322\270\67\0Z\13O\204\30\207\70\355\363\60\4[\10J\204\23K_\4\134\11M\204\26a"
+  "\265c\1]\10J\204\23J_\6^\6\23\274\64\15_\7\15|\26\203\0`\7\42\254\23\203\24a"
+  "\13\65\214\66k\62hZ\62\4b\14E\214\26a\70$\231\333\240\0c\12\65\214\66K&\326\222\5"
+  "d\13E\214\226\225AsK\206\0e\14\65\214\66K\66\14a\226,\0f\13L\204UJ\26MY"
+  "'\0g\14E|\66K\346\226\14a\262\0h\13M\204\26a\70$\231o\1i\7A\214\22\311\60"
+  "j\11S|Ti\324\323\2k\15E\214\26a))iIT\311\2l\10C\214\24Q\337\4m\16"
+  "\67\214\30\213\22ER$ER$\25n\11\65\214\26C\222y\13o\12\65\214\66K\346\226,\0p"
+  "\14E|\26C\222\271\15J\30\2q\13E|\66K\346\226\14a\1r\12\64\214\25\311\20em\0"
+  "s\12\65\214\66K\272j\311\2t\13D\214\65Y\64$Y\243\0u\11\65\214\26\231\267d\10v\12"
+  "\65\214\26\231[R\213\0w\13\67\214\30\251S\244tK\0x\13\65\214\26YR\13\263\244\26y\13"
+  "E|\26\231\267d\10\7\5z\12\65\214\26\203V\314\262A{\13K\204TIT\311\242Z\0|\6"
+  "I\204\26\17}\13K\204\24YTK\242J\4~\21N\204\67C\62\14\241\70<(\312\60$Q\2"
+  "\16N\204\27I\230)Q\232%Y\322\200\5\0\204\20\201\6\33\237\37\17\0\0\0";
 
 static const uint8_t UndergroundClock8[150] U8G2_FONT_SECTION("UndergroundClock8") =
 "\13\0\3\3\3\4\2\2\5\7\10\0\0\10\0\10\0\0\0\0\0\0}\60\12G\305\251\310\370&\251"
@@ -281,7 +292,7 @@ const char btAttribution[] = "Powered by bustimes.org";
 // GitHub Client for firmware updates
 //  - Pass a GitHub token if updates are to be loaded from a private repository
 //
-github ghUpdate("");
+github ghUpdate("","");
 
 #define SCREENSAVERINTERVAL 10000     // How often the screen is changed in sleep mode (ms - 10 seconds)
 #define DATAUPDATEINTERVAL 150000     // How often we fetch data from National Rail (ms - 2.5 mins) - "default" option
@@ -299,6 +310,7 @@ bool dateEnabled = false;           // Showing the date on screen?
 bool weatherEnabled = false;        // Showing weather at station location. Requires an OpenWeatherMap API key.
 bool enableBus = false;             // Include Bus services on the board?
 bool firmwareUpdates = true;        // Check for and install firmware updates automatically at boot?
+bool dailyUpdateCheck = false;      // Check for and install firmware updates at midnight?
 byte sleepStarts = 0;               // Hour at which the overnight sleep (screensaver) begins
 byte sleepEnds = 6;                 // Hour at which the overnight sleep (screensaver) ends
 int brightness = 50;                // Initial brightness level of the OLED screen
@@ -320,6 +332,10 @@ byte altEnds = 23;                  // Hour at which to switch back to the defau
 bool noScrolling = false;           // Suppress all horizontal scrolling
 bool flipScreen = false;            // Rotate screen 180deg
 String timezone = "";               // custom (non UK) timezone for the clock
+bool hidePlatform = false;          // Hide platform numbers on Rail board?
+int nrTimeOffset = 0;               // Offset minutes for Rail departures display
+int prevUpdateCheckDay;             // Day of the month the last daily firmware update check was made
+unsigned long fwUpdateCheckTimer=0; // Next time to check if the day has rolled over for firmware update check
 bool apiKeys = false;               // Does apikeys.json exist?
 
 char hostname[33];                  // Network hostname (mDNS)
@@ -402,6 +418,15 @@ char weatherMsg[46];                            // Current weather at station lo
 unsigned long nextWeatherUpdate = 0;            // When the next weather update is due
 String openWeatherMapApiKey = "";               // The API key to use
 weatherClient currentWeather;                   // Create a weather client
+
+// RSS Client
+rssClient rss;                                  // Create a RSS client
+bool rssEnabled = false;                        // Add RSS feed to the messages
+unsigned long nextRssUpdate = 0;                // When the next RSS update is due
+bool rssAddedtoMsgs = false;
+int lastRssUpdateResult = 0;
+String rssURL;                                  // RSS URL to use
+String rssName;                                 // Name of feed for atrribution
 
 bool noDataLoaded = true;                       // True if no data received for the station
 int lastUpdateResult = 0;                       // Result of last data refresh
@@ -527,7 +552,7 @@ void drawStartupHeading() {
   drawBuildTime();
 }
 
-void drawStationHeader(const char *stopName, const char *callingStopName, const char *platFilter) {
+void drawStationHeader(const char *stopName, const char *callingStopName, const char *platFilter, const int timeOffset) {
 
   // Clear the top line
   if (boardMode == MODE_TUBE || boardMode == MODE_BUS) {
@@ -538,14 +563,21 @@ void drawStationHeader(const char *stopName, const char *callingStopName, const 
 
   u8g2.setFont(NatRailSmall9);
   char boardTitle[95];
-  if (callingStopName[0] && platFilter[0]) snprintf(boardTitle,sizeof(boardTitle),"%s %c%s  (%c%s)",stopName,130,platFilter,129,callingStopName);
-  else if (callingStopName[0] && !platFilter[0]) snprintf(boardTitle,sizeof(boardTitle),"%s  (%c%s)",stopName,129,callingStopName);
-  else if (!callingStopName[0] && platFilter[0]) snprintf(boardTitle,sizeof(boardTitle),"%s %c%s",stopName,130,platFilter);
-  else strncpy(boardTitle,stopName,sizeof(boardTitle));
+  String title = String(stopName) + " ";
+  if (timeOffset) {
+    title+="\x8F";
+    if (timeOffset>0) title+="+";
+    title+=String(timeOffset) + "m ";
+  }
+  if (platFilter[0]) title+="\x8D" + String(platFilter) + " ";
+  if (callingStopName[0]) title+="(\x81" + String(callingStopName) + ")";
+  title.trim();
+  strncpy(boardTitle,title.c_str(),sizeof(boardTitle));
+
   int boardTitleWidth = getStringWidth(boardTitle);
-  int line4Y = (boardMode == MODE_RAIL) ? LINE4 : ULINE4;
 
   if (dateEnabled) {
+    int const dateY=55;
     // Get the date
     char sysTime[29];
     getLocalTime(&timeinfo);
@@ -553,20 +585,20 @@ void drawStationHeader(const char *stopName, const char *callingStopName, const 
     dateWidth = getStringWidth(sysTime);
     dateDay = timeinfo.tm_mday;
     if (callingStopName[0] || boardTitleWidth+dateWidth+10>=SCREEN_WIDTH) {
-      blankArea(SCREEN_WIDTH-70,line4Y,70,SCREEN_HEIGHT-line4Y);
-      u8g2.drawStr(SCREEN_WIDTH-dateWidth,line4Y-1,sysTime); // Date bottom right
+      blankArea(SCREEN_WIDTH-70,dateY,70,SCREEN_HEIGHT-dateY);
+      u8g2.drawStr(SCREEN_WIDTH-dateWidth,dateY-1,sysTime); // Date bottom right
       centreText(boardTitle,LINE0-1);
     } else {
-      u8g2.drawStr(SCREEN_WIDTH-dateWidth,ULINE0-1,sysTime); // right-aligned date top
+      u8g2.drawStr(SCREEN_WIDTH-dateWidth,LINE0-1,sysTime); // right-aligned date top
       if ((SCREEN_WIDTH-boardTitleWidth)/2 < dateWidth+8) {
         // station name left aligned
-        u8g2.drawStr(0,ULINE0-1,boardTitle);
+        u8g2.drawStr(0,LINE0-1,boardTitle);
       } else {
-        centreText(boardTitle,ULINE0-1);
+        centreText(boardTitle,LINE0-1);
       }
     }
   } else {
-    centreText(boardTitle,ULINE0-1);
+    centreText(boardTitle,LINE0-1);
   }
 }
 
@@ -588,7 +620,7 @@ void drawCurrentTime(bool update) {
     strcpy(displayedTime,sysTime);
     if (dateEnabled && timeinfo.tm_mday!=dateDay) {
       // Need to update the date on screen
-      drawStationHeader(station.location,callingStation,platformFilter);
+      drawStationHeader(station.location,callingStation,platformFilter,nrTimeOffset);
       if (update) u8g2.sendBuffer();  // Just refresh on new date
     }
   }
@@ -646,12 +678,21 @@ void showNoDataScreen() {
   u8g2.clearBuffer();
   char msg[60];
   u8g2.setFont(NatRailTall12);
-  if (boardMode!=MODE_RAIL) strcpy(msg,"No data available for the selected station.");
-  else sprintf(msg,"No data available for station code \"%s\".",crsCode);
+  switch (boardMode) {
+    case MODE_RAIL:
+      sprintf(msg,"No data available for station code \"%s\".",crsCode);
+      break;
+    case MODE_TUBE:
+      strcpy(msg,"No data available for the selected station.");
+      break;
+    case MODE_BUS:
+      strcpy(msg,"No data available for the selected bus stop.");
+      break;
+  }
   centreText(msg,-1);
   u8g2.setFont(NatRailSmall9);
-  centreText(F("Please ensure you have selected a valid station"),14);
-  centreText(F("Go to the URL below to choose a station..."),26);
+  centreText(F("Please check you have selected a valid location"),14);
+  centreText(F("Go to the URL below to choose a location..."),26);
   centreText(myUrl,40);
   u8g2.sendBuffer();
 }
@@ -842,7 +883,7 @@ void doClockCheck() {
   if (!firstLoad) {
     if (millis()>nextClockUpdate) {
       drawCurrentTime(true);
-      nextClockUpdate=millis()+500;
+      nextClockUpdate=millis()+250;
     }
   }
 }
@@ -960,6 +1001,7 @@ void loadConfig() {
         if (settings[F("weather")].is<bool>() && openWeatherMapApiKey.length())
                                                     weatherEnabled = settings[F("weather")];
         if (settings[F("update")].is<bool>())            firmwareUpdates = settings[F("update")];
+        if (settings[F("updateDaily")].is<bool>())       dailyUpdateCheck = settings[F("updateDaily")];
         if (settings[F("sleepStarts")].is<int>())        sleepStarts = settings[F("sleepStarts")];
         if (settings[F("sleepEnds")].is<int>())          sleepEnds = settings[F("sleepEnds")];
         if (settings[F("brightness")].is<int>())         brightness = settings[F("brightness")];
@@ -995,6 +1037,13 @@ void loadConfig() {
         if (settings[F("noScroll")].is<bool>())          noScrolling = settings[F("noScroll")];
         if (settings[F("flip")].is<bool>())              flipScreen = settings[F("flip")];
         if (settings[F("TZ")].is<const char*>())         timezone = settings[F("TZ")].as<String>();
+        if (settings[F("nrTimeOffset")].is<int>())       nrTimeOffset = settings[F("nrTimeOffset")];
+        if (settings[F("hidePlatform")].is<bool>())      hidePlatform = settings[F("hidePlatform")];
+
+        if (settings[F("rssUrl")].is<const char*>())     rssURL = String(settings[F("rssUrl")]);
+        if (settings[F("rssName")].is<const char*>())    rssName = String(settings[F("rssName")]);
+        if (rssURL != "") rssEnabled = true; else rssEnabled = false;
+
       } else {
         // JSON deserialization failed - TODO
       }
@@ -1019,9 +1068,15 @@ bool setAlternateStation() {
   }
 }
 
+void updateRssFeed() {
+  if (lastRssUpdateResult=rss.loadFeed(rssURL); lastRssUpdateResult == UPD_SUCCESS) nextRssUpdate = millis() + 600000; // update every ten minutes
+  else nextRssUpdate = millis() + 300000; // Failed so try again in 5 minutes
+}
+
 // Soft reset/reload
 void softResetBoard() {
   int previousMode = boardMode;
+  String prevRssUrl = rssURL;
 
   // Reload the settings
   loadConfig();
@@ -1100,6 +1155,16 @@ void softResetBoard() {
         // Create the Bus client
         busdata = new busDataClient();
         break;
+    }
+  }
+
+  rssAddedtoMsgs = false;
+  if (rssEnabled && prevRssUrl != rssURL) {
+    rss.numRssTitles = 0;
+    if (boardMode == MODE_RAIL || boardMode == MODE_TUBE) {
+      prevProgressBarPosition=50;
+      progressBar(F("Updating RSS headlines feed"),50);
+      updateRssFeed();
     }
   }
 
@@ -1221,16 +1286,42 @@ bool checkForFirmwareUpdate() {
  * Station Board functions - pulling updates and animating the Departures Board main display
  */
 
+void addRssMessage() {
+    // Check if we need to add RSS headlines
+    if (rssEnabled && messages.numMessages<MAXBOARDMESSAGES && rss.numRssTitles>0) {
+      sprintf(messages.messages[messages.numMessages],"%s: %s",rssName.c_str(),rss.rssTitle[0]);
+      for (int i=1;i<rss.numRssTitles;i++) {
+        if (strlen(messages.messages[messages.numMessages]) + strlen(rss.rssTitle[i]) + 1 < MAXMESSAGESIZE) {
+          strcat(messages.messages[messages.numMessages], (boardMode==MODE_TUBE)?"\x81":"\x90");
+          strcat(messages.messages[messages.numMessages],rss.rssTitle[i]);
+        } else {
+          break;
+        }
+      }
+      messages.numMessages++;
+      rssAddedtoMsgs = true;
+    }
+}
+
+void removeRssMessage() {
+  if (rssAddedtoMsgs) {
+    messages.numMessages--; // Remove the RSS entry so we don't confuse change detection
+    rssAddedtoMsgs = false;
+  }
+}
+
 // Request a data update via the raildataClient
 bool getStationBoard() {
   if (!firstLoad) showUpdateIcon(true);
-  lastUpdateResult = raildata->updateDepartures(&station,&messages,crsCode,nrToken,MAXBOARDSERVICES,enableBus,callingCrsCode,cleanPlatformFilter);
+  removeRssMessage();
+  lastUpdateResult = raildata->updateDepartures(&station,&messages,crsCode,nrToken,MAXBOARDSERVICES,enableBus,callingCrsCode,cleanPlatformFilter,nrTimeOffset);
   nextDataUpdate = millis()+apiRefreshRate;
   if (lastUpdateResult == UPD_SUCCESS || lastUpdateResult == UPD_NO_CHANGE) {
     showUpdateIcon(false);
     lastDataLoadTime=millis();
     noDataLoaded=false;
     dataLoadSuccess++;
+    addRssMessage();
     return true;
   } else if (lastUpdateResult == UPD_DATA_ERROR || lastUpdateResult == UPD_TIMEOUT) {
     lastLoadFailure=millis();
@@ -1257,7 +1348,7 @@ void drawPrimaryService(bool showVia) {
   u8g2.setFont(NatRailTall12);
   blankArea(0,LINE1,256,LINE2-LINE1);
   destPos = u8g2.drawStr(0,LINE1-1,station.service[0].sTime) + 6;
-  if (station.service[0].platform[0] && strlen(station.service[0].platform)<3 && station.service[0].serviceType == TRAIN) {
+  if (station.service[0].platform[0] && strlen(station.service[0].platform)<3 && station.service[0].serviceType == TRAIN && !hidePlatform) {
     destPos += u8g2.drawStr(destPos,LINE1-1,station.service[0].platform) + 6;
   } else if (station.service[0].serviceType == BUS) {
     destPos += u8g2.drawStr(destPos,LINE1-1,"~") + 6; // Bus icon
@@ -1307,13 +1398,13 @@ void drawServiceLine(int line, int y) {
     u8g2.drawStr(0,y-1,ordinal);
     int destPos = u8g2.drawStr(23,y-1,station.service[line].sTime) + 27;
     char plat[3];
-    if (station.platformAvailable) {
+    if (station.platformAvailable && !hidePlatform) {
       if (station.service[line].platform[0] && strlen(station.service[line].platform)<3 && station.service[line].serviceType == TRAIN) {
         strncpy(plat,station.service[line].platform,3);
         plat[2]='\0';
       } else {
-        if (station.service[line].serviceType == BUS) strcpy(plat,"~");  // Bus icon
-        else strcpy(plat,"}}");
+        if (station.service[line].serviceType == BUS) strcpy(plat,"\x86");  // Bus icon
+        else strcpy(plat,"\x96\x96");
       }
       u8g2.drawStr(destPos+11-getStringWidth(plat),y-1,plat);
       destPos+=16;
@@ -1361,7 +1452,7 @@ void drawStationBoard() {
     // Clear the top two lines
     blankArea(0,LINE0,256,LINE2-1);
   }
-  drawStationHeader(station.location,callingStation,platformFilter);
+  drawStationHeader(station.location,callingStation,platformFilter,nrTimeOffset);
 
   // Draw the primary service line
   isShowingVia=false;
@@ -1489,8 +1580,8 @@ void drawCurrentTimeUG(bool update) {
     u8g2.setFont(Underground10);
 
     if (dateEnabled && timeinfo.tm_mday!=dateDay) {
-      if (boardMode == MODE_TUBE) drawStationHeader(tubeName.c_str(),"","");
-      else drawStationHeader(busName.c_str(),"",busFilter);
+      if (boardMode == MODE_TUBE) drawStationHeader(tubeName.c_str(),"","",0);
+      else drawStationHeader(busName.c_str(),"",busFilter,0);
       if (update) u8g2.sendBuffer();  // Just refresh on new date
       u8g2.setFont(Underground10);
     }
@@ -1513,6 +1604,7 @@ void tflCallback() {
 
 bool getUndergroundBoard() {
   if (!firstLoad) showUpdateIcon(true);
+  removeRssMessage();
   lastUpdateResult = tfldata->updateArrivals(&station,&messages,tubeId,tflAppkey,&tflCallback);
   nextDataUpdate = millis()+UGDATAUPDATEINTERVAL; // default update freq
   if (lastUpdateResult == UPD_SUCCESS || lastUpdateResult == UPD_NO_CHANGE) {
@@ -1520,7 +1612,7 @@ bool getUndergroundBoard() {
     lastDataLoadTime=millis();
     noDataLoaded=false;
     dataLoadSuccess++;
-    if (noScrolling) messages.numMessages = 0;
+    if (noScrolling) messages.numMessages = 0; else addRssMessage();
     return true;
   } else if (lastUpdateResult == UPD_DATA_ERROR || lastUpdateResult == UPD_TIMEOUT) {
     lastLoadFailure=millis();
@@ -1573,7 +1665,7 @@ void drawUndergroundBoard() {
       // Clear the top three lines
       blankArea(0,ULINE0,256,ULINE3-1);
   }
-  drawStationHeader(tubeName.c_str(),"","");
+  drawStationHeader(tubeName.c_str(),"","",0);
 
   if (station.boardChanged) {
     // prepare to scroll up primary services
@@ -1688,7 +1780,7 @@ void drawBusDeparturesBoard() {
       // Clear the top three lines
       blankArea(0,ULINE0,256,ULINE3-1);
   }
-  drawStationHeader(busName.c_str(),"",busFilter);
+  drawStationHeader(busName.c_str(),"",busFilter,0);
 
   if (station.boardChanged) {
     // prepare to scroll up primary services
@@ -2017,7 +2109,40 @@ void handleNotFound() {
   else if (server.uri() == F("/tube.webp")) handleStreamFlashFile(server.uri(), tubeicon, sizeof(tubeicon));
   else if (server.uri() == F("/nr.webp")) handleStreamFlashFile(server.uri(), nricon, sizeof(nricon));
   else if (server.uri() == F("/favicon.png")) handleStreamFlashFile(server.uri(), faviconpng, sizeof(faviconpng));
+  else if (server.uri() == F("/rss.json")) handleStreamFlashFile(server.uri(), rssjson, sizeof(rssjson));
   else sendResponse(404,F("Not Found"));
+}
+
+String getResultCodeText(int resultCode) {
+  switch (resultCode) {
+    case UPD_SUCCESS:
+      return F("SUCCESS");
+      break;
+    case UPD_NO_CHANGE:
+      return F("SUCCESS (NO CHANGES)");
+      break;
+    case UPD_DATA_ERROR:
+      return F("DATA ERROR");
+      break;
+    case UPD_UNAUTHORISED:
+      return F("UNAUTHORISED");
+      break;
+    case UPD_HTTP_ERROR:
+      return F("HTTP ERROR");
+      break;
+    case UPD_INCOMPLETE:
+      return F("INCOMPLETE DATA RECEIVED");
+      break;
+    case UPD_NO_RESPONSE:
+      return F("NO RESPONSE FROM SERVER");
+      break;
+    case UPD_TIMEOUT:
+      return F("TIMEOUT WAITING FOR SERVER");
+      break;
+    default:
+      return F("OTHER ERROR");
+      break;
+  }
 }
 
 // Send some useful system & station information to the browser
@@ -2052,39 +2177,21 @@ void handleInfo() {
       message+=busdata->lastErrorMsg;
       break;
   }
-  message+="\nServices: " + String(station.numServices) + F("\nMessages: ");
-  if (boardMode == MODE_TUBE) message+=String(messages.numMessages-1); else message+=String(messages.numMessages);
-  message+=F("\n");
-  if (boardMode != MODE_BUS) for (int i=0;i<messages.numMessages;i++) message+=String(messages.messages[i]) + "\n";
   message+=F("\nUpdate result code: ");
-  switch (lastUpdateResult) {
-    case UPD_SUCCESS:
-      message+=F("SUCCESS");
-      break;
-    case UPD_NO_CHANGE:
-      message+=F("SUCCESS (NO CHANGES)");
-      break;
-    case UPD_DATA_ERROR:
-      message+=F("DATA ERROR");
-      break;
-    case UPD_UNAUTHORISED:
-      message+=F("UNAUTHORISED");
-      break;
-    case UPD_HTTP_ERROR:
-      message+=F("HTTP ERROR");
-      break;
-    case UPD_INCOMPLETE:
-      message+=F("INCOMPLETE JSON RECEIVED");
-      break;
-    case UPD_NO_RESPONSE:
-      message+=F("NO RESPONSE FROM SERVER");
-      break;
-    case UPD_TIMEOUT:
-      message+=F("TIMEOUT WAITING FOR SERVER");
-      break;
-    default:
-      message+="ERROR CODE (" + String(lastUpdateResult) + F(")");
-      break;
+  message+=getResultCodeText(lastUpdateResult);
+  message+="\nServices: " + String(station.numServices) + F("\nMessages: ");
+  int nMsgs = messages.numMessages;
+  if (rssEnabled && rssAddedtoMsgs) nMsgs--;
+  if (boardMode == MODE_TUBE) nMsgs--;
+  message+=String(nMsgs) + F("\n\n");
+
+  if (rssEnabled) {
+    message+="Last RSS result: " + rss.getLastError() + F("\nResult code: ");
+    message+=getResultCodeText(lastRssUpdateResult) + F("\nNext RSS update: ") + String(nextRssUpdate-millis()) + F("ms\n\n");
+  }
+
+  if (weatherEnabled) {
+    message+="Last weather result: " + currentWeather.lastErrorMsg + F("\nNext weather update: ") + String(nextWeatherUpdate-millis()) + F("ms");
   }
   sendResponse(200,message);
 }
@@ -2322,6 +2429,8 @@ void departureBoardLoop() {
 	  } else if (noDataLoaded) showNoDataScreen();
   } else if (weatherEnabled && (millis()>nextWeatherUpdate) && (!noDataLoaded) && (!isScrollingStops) && (!isScrollingService) && (!isSleeping) && (wifiConnected)) {
     updateCurrentWeather(stationLat,stationLon);
+  } else if (rssEnabled && (millis()>nextRssUpdate) && (!noDataLoaded) && (!isScrollingStops) && (!isScrollingService) && (!isSleeping) && (wifiConnected)) {
+    updateRssFeed();
   }
 
   if (millis()>timer && numMessages && !isScrollingStops && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR && !noScrolling) {
@@ -2444,7 +2553,7 @@ void undergroundArrivalsLoop() {
   }
 
     // Scrolling the additional services
-  if (millis()>serviceTimer && !isScrollingService && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
+  if (millis()>serviceTimer && !isScrollingService && !isSleeping && !noDataLoaded && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
     if (station.numServices<=2 && messages.numMessages==1 && attributionScrolled) {
       // There are no additional services to scroll in so static attribution.
       serviceTimer = millis() + 30000;
@@ -2545,7 +2654,7 @@ void undergroundArrivalsLoop() {
   if (!isSleeping) {
     // Check if the clock should be updated
     if (millis()>nextClockUpdate) {
-      nextClockUpdate = millis()+500;
+      nextClockUpdate = millis()+250;
       drawCurrentTimeUG(true);
     }
 
@@ -2582,7 +2691,7 @@ void busDeparturesLoop() {
   }
 
   // Scrolling the additional services
-  if (millis()>serviceTimer && !isScrollingPrimary && !isScrollingService && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
+  if (millis()>serviceTimer && !isScrollingPrimary && !isScrollingService && !isSleeping && !noDataLoaded && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
     // Need to change to the next service if there is one
     if (station.numServices<=2 && messages.numMessages==1) {
       // There are no additional services or weather to scroll in so static attribution.
@@ -2668,7 +2777,7 @@ void busDeparturesLoop() {
   if (!isSleeping) {
     // Check if the clock should be updated
     if (millis()>nextClockUpdate) {
-      nextClockUpdate = millis()+500;
+      nextClockUpdate = millis()+250;
       drawCurrentTimeUG(true);    // just use the Tube clock for bus mode
       u8g2.setFont(NatRailSmall9);
     }
@@ -2869,10 +2978,21 @@ void setup(void) {
     delay(5000);
     ESP.restart();
   }
+  prevUpdateCheckDay = timeinfo.tm_mday;
 
   station.numServices=0;
+  if (rssEnabled && boardMode!=MODE_BUS) {
+    progressBar(F("Loading RSS headlines feed"),60);
+    updateRssFeed();
+  }
+
+  if (weatherEnabled && boardMode!=MODE_TUBE) {
+    progressBar(F("Getting weather conditions"),64);
+    updateCurrentWeather(stationLat,stationLon);
+  }
+
   if (boardMode == MODE_RAIL) {
-      progressBar(F("Initialising National Rail interface"),60);
+      progressBar(F("Initialising National Rail interface"),67);
       altStationActive = setAlternateStation();  // Check & set the alternate station if appropriate
       raildata = new raildataXmlClient();
       int res = raildata->init(wsdlHost, wsdlAPI, &raildataCallback);
@@ -2897,6 +3017,19 @@ void setup(void) {
 
 
 void loop(void) {
+
+  // Check for firmware updates daily if enabled
+  if (dailyUpdateCheck && millis()>fwUpdateCheckTimer) {
+    fwUpdateCheckTimer = millis() + 3300000 + random(600000); // check again in 55 to 65 mins
+    if (getLocalTime(&timeinfo)) {
+      if (timeinfo.tm_mday != prevUpdateCheckDay) {
+        if (ghUpdate.getLatestRelease()) {
+          checkForFirmwareUpdate();
+          prevUpdateCheckDay = timeinfo.tm_mday;
+        }
+      }
+    }
+  }
 
   bool wasSleeping = isSleeping;
   isSleeping = isSnoozing();

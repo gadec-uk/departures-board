@@ -129,14 +129,15 @@ int busDataClient::updateDepartures(rdStation *station, const char *locationId, 
 
     WiFiClientSecure httpsClient;
     httpsClient.setInsecure();
-    httpsClient.setTimeout(15000);
+    httpsClient.setTimeout(5000);
+    httpsClient.setConnectionTimeout(5000);
     station->boardChanged=false;
 
     int retryCounter=0;
-    while (!httpsClient.connect(apiHost,443) && (retryCounter++ < 15)){
+    while (!httpsClient.connect(apiHost,443) && (retryCounter++ < 10)){
         delay(200);
     }
-    if (retryCounter>=15) {
+    if (retryCounter>=10) {
         lastErrorMsg = F("Connection timeout");
         return UPD_NO_RESPONSE;
     }
@@ -350,7 +351,7 @@ int busDataClient::getStopLongName(const char *locationId, char *locationName) {
     parser.setListener(this);
     WiFiClientSecure httpsClient;
     httpsClient.setInsecure();
-    httpsClient.setTimeout(15000);
+    httpsClient.setTimeout(5000);
 
     int retryCounter=0;
     while (!httpsClient.connect(apiHost,443) && (retryCounter++ < 15)){

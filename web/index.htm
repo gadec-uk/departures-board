@@ -13,15 +13,22 @@
     <link rel="icon" href="favicon.png" type="image/png"/>
     <title>Departures Board</title>
 </head>
-<body>
-  <div style="width: min(90%, 500px); margin: 0 auto; padding: 0 5px;">
+<style>
+.floating-footer {position:fixed;bottom:0;left:0;width:100%;background:#fff;z-index:9999;}
+.floating-footer .footer-inner {width:min(90%, 500px);margin:0 auto;padding:10px;border-top:1px solid #ccc;text-align:center;}
+.inline-row {white-space:nowrap;margin-top:-5px;}
+.inline-row label {display:inline-block;margin-right:8px;font-weight:normal;}
+.inline-row .form-control {display:inline-block;width:auto;}
+</style>
+<body style="padding-bottom:60px;">
+  <div style="width:min(90%,500px);margin:0 auto;padding:0 5px;">
     <form id="formsettings">
       <fieldset>
-        <legend style="position: relative; text-align: center; min-height: 45px; padding-top:8px;">
+        <legend style="position:relative;text-align:center;min-height:45px;padding-top:8px;">
           <div id="nrT" style="display:none">Rail Departures Board</div>
           <div id="tflT" style="display:none">Tube Arrivals Board</div>
           <div id="busT" style="display:none">Bus Departures Board</div>
-          <div class="dropdown" style="position: absolute; top: 5px; right: 0;">
+          <div class="dropdown" style="position:absolute;top:5px;right:0;">
             <button class="btn btn-default dropdown-toggle" type="button" id="menuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
               &#9776;
             </button>
@@ -34,7 +41,6 @@
           </div>
         </legend>
 
-        <!-- Board Mode Selector -->
         <div class="form-group" id="modeSelector">
           <label class="control-label">Board Mode</label>
           <div class="btn-group btn-group-justified" data-toggle="buttons">
@@ -56,7 +62,7 @@
         </div>
 
         <div class="form-group" id="nrInvalidToken" style="display:none">
-          <span class="help-block" style="text-align: center; background-color: black; border-color: red; border-style: solid; border-width: 3px; color: white; padding: 8px;">You must enter a valid National Rail API token to use Rail Departures mode. Manage your API keys <a href="/keys.htm">here</a>.</span>
+          <span class="help-block" style="text-align:center;background-color:black;border-color:red;border-style:solid;border-width:3px;color:white;padding:8px;">You must enter a valid National Rail API token to use Rail Departures mode. Manage your API keys <a href="/keys.htm">here</a>.</span>
         </div>
 
         <div class="form-group" id="tflSearchBox" style="display:none">
@@ -66,29 +72,29 @@
 
         <div class="form-group" id="busAtcoBox" style="display:none">
           <label class="control-label" for="busAtco">Bus Stop ATCO code</label>
-          <div style="display: flex; gap: 10px;">
-            <div style="flex: 1;">
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;">
               <input id="busAtco" type="text" placeholder="Enter the ATCO code and press verify" class="form-control input-md" style="width:100%;">
             </div>
-            <div style="flex-shrink: 0;">
+            <div style="flex-shrink:0;">
               <button id="verifyAtco" name="verifyAtco" class="btn" type="button" disabled>Verify</button>
             </div>
           </div>
           <span class="help-block" id="busAtcoLongName"></span>
 
-          <div id="busFilterBox" style="margin-bottom:10px; display:none">
+          <div id="busFilterBox" style="margin-bottom:10px;display:none">
             <label class="control-label" for="busFilter">Only show these Bus services</label>
             <input id="busFilter" type="text" maxlength="24" placeholder="Enter comma separated service numbers or blank for all" class="form-control input-md">
           </div>
 
           <div id="busAtcoHistory" style="display:none">
             <label for="busAtcoHistoryList">Recently verified ATCO codes</label>
-            <div style="display: flex; gap: 10px;">
-              <div style="flex: 1;">
+            <div style="display:flex;gap:10px;">
+              <div style="flex:1;">
                 <select id="busAtcoHistoryList" class="form-control">
                 </select>
               </div>
-              <div style="flex-shrink: 0;">
+              <div style="flex-shrink:0;">
                 <button id="clearHistory" name="clearHistory" class="btn" type="button">Clear History</button>
               </div>
             </div>
@@ -100,11 +106,11 @@
 
         <div class="form-group" id="nrCallingBox" style="display:none">
           <label class="control-label" for="callingStation">Only show services calling at</label>
-          <div style="display: flex; gap: 10px;">
-            <div style="flex: 1;">
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;">
               <input id="callingStation" type="text" placeholder="Station name or leave blank for all services" class="form-control input-md typeahead" style="width:100%;">
             </div>
-            <div style="flex-shrink: 0;">
+            <div style="flex-shrink:0;">
               <button id="clearFilter" name="clearFilter" class="btn" type="button">Clear</button>
             </div>
           </div>
@@ -116,22 +122,22 @@
 
         <div class="form-group" id="nrAltStation" style="display:none">
           <label class="control-label" for="altStation">Alternate station</label>
-          <div style="display: flex; gap: 10px;">
-            <div style="flex: 1;">
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;">
               <input id="altStation" type="text" placeholder="Type the station name" class="form-control input-md typeahead" style="width:100%;">
             </div>
-            <div style="flex-shrink: 0;">
+            <div style="flex-shrink:0;">
               <button id="clearAltStation" name="clearAltStation" class="btn" type="button">Clear</button>
             </div>
           </div>
 
-          <div class="form-group" id="nrAltCallingBox" style="padding-top:10px; display:none">
+          <div class="form-group" id="nrAltCallingBox" style="padding-top:10px;display:none">
             <label class="control-label" for="altCallingStation">Only show services calling at (alternate active)</label>
-            <div style="display: flex; gap: 10px;">
-              <div style="flex: 1;">
+            <div style="display:flex;gap:10px;">
+              <div style="flex:1;">
                 <input id="altCallingStation" type="text" placeholder="Station name or leave blank for all services" class="form-control input-md typeahead" style="width:100%;">
               </div>
-              <div style="flex-shrink: 0;">
+              <div style="flex-shrink:0;">
                 <button id="altClearFilter" name="altClearFilter" class="btn" type="button">Clear</button>
               </div>
             </div>
@@ -142,13 +148,13 @@
           </div>
 
           <div class="form-group" id="altStationTimeSelectors" style="display:none;">
-            <div style="display: flex; gap: 10px;">
-              <div style="flex: 1;">
+            <div style="display:flex;gap:10px;">
+              <div style="flex:1;">
                 <label for="altStart">Show alternate from</label>
                 <select id="altStart" class="form-control">
                 </select>
               </div>
-              <div style="flex: 1;">
+              <div style="flex:1;">
                 <label for="altEnd">Show default from</label>
                 <select id="altEnd" class="form-control">
                 </select>
@@ -157,89 +163,132 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="control-label" for="brightness">Brightness</label>
-          <input style="padding: 0px;" type="range" min="1" max="255" value="50" class="form-control" id="brightness">
-          <span class="help-block">Lowering the brightness will help prevent burn-in.</span>
-        </div>
+        <ul class="nav nav-tabs" style="margin-top:30px;font-weight:bold;" id="optTabs">
+            <li class="active">
+                <a href="#optionsTab" data-toggle="tab">General Options</a>
+            </li>
+            <li>
+                <a href="#advancedTab" data-toggle="tab">Advanced Options</a>
+            </li>
+        </ul>
 
-        <div class="form-group">
-          <label class="control-label">Options</label>
-          <div class="checkbox">
-            <label><input type="checkbox" id="showDate"> Show the date on screen</label>
-          </div>
-          <div id="optBuses" class="checkbox" style="display:none">
-            <label><input type="checkbox" id="enableBuses"> Include bus replacement services</label>
-          </div>
-          <div id="optWeather" class="checkbox" style="display:none">
-            <label><input type="checkbox" id="enableWeather"> Include current weather at location</label>
-          </div>
-          <div id="optFastRefresh" class="checkbox" style="display:none">
-            <label><input type="checkbox" id="enableFastRefresh"> Increase API refresh rate</label>
-          </div>
-          <div id="optNoScroll" class="checkbox" style="display:none">
-            <label><input type="checkbox" id="noScrolling"> Suppress calling at / information messages</label>
-          </div>
-          <div class="checkbox">
-            <label><input type="checkbox" id="optFlip"> Flip the display 180&deg;</label>
-          </div>
-          <div class="checkbox">
-            <label><input type="checkbox" id="optHost"> Set custom hostname for this board</label>
-          </div>
-          <div id="customHostbox" style="display:none;">
-            <input id="customHost" type="text" maxlength="32" placeholder="Enter the hostname or leave blank for the default" class="form-control input-md">
-            <span class="help-block">Enter the new hostname for this board (letters, numbers, hyphens only).</span>
-          </div>
-          <div class="checkbox">
-            <label><input type="checkbox" id="optTZ"> Custom (non-UK) time zone (only for clock display)</label>
-          </div>
-          <div id="customTZbox" style="display:none;">
-            <input id="customTZ" type="text" maxlength="24" placeholder="Enter the POSIX time zone string or leave blank for UK" class="form-control input-md">
-            <span class="help-block">Enter the exact POSIX time zone. Tap <a href="https://github.com/gadec-uk/departures-board/#custom-time-zones" target="_blank">here</a> for help.</span>
-          </div>
-          <div class="checkbox">
-            <label><input type="checkbox" id="enableFirmware"> Enable automatic firmware updates at startup</label>
-          </div>
-          <div class="checkbox">
-            <label><input type="checkbox" id="enableSleep"> Enable overnight sleep mode (screensaver)</label>
-          </div>
-        </div>
-        <div class="form-group" id="sleepTimeSelectors" style="display:none">
-          <div style="display: flex; gap: 10px;">
-            <div style="flex: 1;">
-              <label for="sleepStart">Sleep start hour</label>
-              <select id="sleepStart" class="form-control">
-              </select>
+        <div class="tab-content" style="margin-top:20px;">
+          <div class="tab-pane fade in active" id="optionsTab">
+            <div class="form-group">
+              <label class="control-label" for="brightness">Brightness</label>
+              <input style="padding:0px;" type="range" min="1" max="255" value="50" class="form-control" id="brightness">
+              <span class="help-block">Lowering the brightness will help prevent burn-in.</span>
             </div>
-            <div style="flex: 1;">
-              <label for="sleepEnd">Sleep end hour</label>
-              <select id="sleepEnd" class="form-control">
-              </select>
+
+            <div class="form-group">
+              <div class="checkbox">
+                <label><input type="checkbox" id="showDate"> Show the date on screen</label>
+              </div>
+              <div id="optBuses" class="checkbox" style="display:none">
+                <label><input type="checkbox" id="enableBuses"> Include bus replacement services </label>
+                <span class="glyphicon glyphicon-info-sign" data-toggle="tooltip" data-placement="right" title="A small bus icon will replace platform number when the service is a bus replacement." style="cursor:pointer;"></span>
+              </div>
+              <div id="optWeather" class="checkbox" style="display:none">
+                <label><input type="checkbox" id="enableWeather"> Include current weather at location </label>
+                <span class="glyphicon glyphicon-info-sign" data-toggle="tooltip" data-placement="right" title="The option requires a valid OpenWeather Map API key." style="cursor:pointer;"></span>
+              </div>
+              <div id="optShowPlatform" class="checkbox" style="display:none">
+                <label><input type="checkbox" id="showPlatform"> Show platform numbers (if available) </label>
+                <span class="glyphicon glyphicon-info-sign" data-toggle="tooltip" data-placement="right" title="When available, platform numbers are shown to the left of the destination." style="cursor:pointer;"></span>
+              </div>
+              <div class="checkbox">
+                <label><input type="checkbox" id="enableFirmware"> Enable automatic firmware updates at startup</label>
+              </div>
+              <div class="checkbox">
+                <label><input type="checkbox" id="enableFirmwareDaily"> Enable daily check for firmware updates </label>
+                <span class="glyphicon glyphicon-info-sign" data-toggle="tooltip" data-placement="right" title="When enabled, the system will check for and install any updates just after midnight if powered on." style="cursor:pointer;"></span>
+              </div>
+              <div class="checkbox">
+                <label><input type="checkbox" id="enableSleep"> Enable overnight sleep mode (screensaver)</label>
+              </div>
+            </div>
+            <div class="form-group" id="sleepTimeSelectors" style="display:none">
+              <div style="display:flex;gap:10px;">
+                <div style="flex:1;">
+                  <label for="sleepStart">Sleep start hour</label>
+                  <select id="sleepStart" class="form-control">
+                  </select>
+                </div>
+                <div style="flex:1;">
+                  <label for="sleepEnd">Sleep end hour</label>
+                  <select id="sleepEnd" class="form-control">
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="advancedTab">
+            <div class="form-group" style="margin-bottom:0;">
+              <div class="checkbox">
+                <label><input type="checkbox" id="optFlip"> Flip the display 180&deg;</label>
+              </div>
+              <div class="checkbox">
+                <label><input type="checkbox" id="optHost"> Set custom hostname for this board</label>
+              </div>
+              <div id="customHostbox" style="display:none;">
+                <input id="customHost" type="text" maxlength="32" placeholder="Enter the hostname or leave blank for the default" class="form-control input-md">
+                <span class="help-block">Enter the new hostname for this board (letters, numbers, hyphens only).</span>
+              </div>
+              <div class="checkbox" style="margin-top:-5px;">
+                <label><input type="checkbox" id="optTZ"> Custom (non-UK) time zone (only for clock display)</label>
+              </div>
+              <div id="customTZbox" style="display:none;">
+                <input id="customTZ" type="text" maxlength="24" placeholder="Enter the POSIX time zone string or leave blank for UK" class="form-control input-md">
+                <span class="help-block">Enter the exact POSIX time zone. Tap <a href="https://github.com/gadec-uk/departures-board/#custom-time-zones" target="_blank">here</a> for help.</span>
+              </div>
+              <div id="optNoScroll" class="checkbox" style="margin-top:-5px;display:none">
+                <label><input type="checkbox" id="noScrolling"> Suppress calling at / information messages </label>
+                <span class="glyphicon glyphicon-info-sign" data-toggle="tooltip" data-placement="right" title="Suppresses all horizontal scrolling. RSS feeds will not be shown when this option is selected." style="cursor:pointer;"></span>
+              </div>
+              <div id="optFastRefresh" class="checkbox" style="display:none">
+                <label><input type="checkbox" id="enableFastRefresh"> Increase API refresh rate</label>
+                <span class="glyphicon glyphicon-info-sign" data-toggle="tooltip" data-placement="right" title="Increases the frequency of updates from National Rail. Not recommended for normal use." style="cursor:pointer;"></span>
+              </div>
+            </div>
+            <div id="optRssFeed" style="margin-bottom:14px;display:none;">
+                <label for="optRssFeed">Display RSS news headlines feed from:</label>
+                <span class="glyphicon glyphicon-info-sign" data-toggle="tooltip" data-placement="right" title="The top 5 news headlines from the selected feed will be shown after any other service messages." style="cursor:pointer;"></span>
+                <select id="rssFeedList" class="form-control">
+                </select>
+            </div>
+            <div id="optNrTimeOffset" class="inline-row" style="display:none;">
+                <label for="nrTimeOffset">Display departures offset by:</label>
+                <select id="nrTimeOffset" class="form-control">
+                </select>
+                <span class="glyphicon glyphicon-info-sign" data-toggle="tooltip" data-placement="right" title="Useful if you want display departures further into the future (or the past). Does not affect the clock display." style="cursor:pointer;"></span>
             </div>
           </div>
         </div>
 
-        <div class="form-group" style="text-align: center;">
-          <button id="save" name="save" class="btn btn-primary" type="submit">Save Settings</button>
-        </div>
-
-        <div class="form-group" style="padding-top: 0px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="flex: 1; text-align: left;">
-              <span class="help-block" id="fwinfo" style="margin: 0;"></span>
+        <div class="form-group" style="padding-top:15px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="flex:1;text-align:left;">
+              <span class="help-block" id="fwinfo" style="margin:0;"></span>
             </div>
             <div id="nrAtt" style="display:none">
-              <a href="https://www.nationalrail.co.uk" target="_blank"><img src="/nrelogo.webp" alt="Logo" style="max-height: 40px;"></a>
+              <a href="https://www.nationalrail.co.uk" target="_blank"><img src="/nrelogo.webp" alt="Logo" style="max-height:40px;"></a>
             </div>
             <div id="tflAtt" style="display:none">
-              <a href="https://tfl.gov.uk/" target="_blank"><img src="/tfllogo.webp" alt="Logo" style="max-height: 40px;"></a>
+              <a href="https://tfl.gov.uk/" target="_blank"><img src="/tfllogo.webp" alt="Logo" style="max-height:40px;"></a>
             </div>
             <div id="btAtt" style="display:none">
-              <a href="https://bustimes.org/" target="_blank"><img src="/btlogo.webp" alt="Logo" style="max-height: 40px;"></a>
+              <a href="https://bustimes.org/" target="_blank"><img src="/btlogo.webp" alt="Logo" style="max-height:40px;"></a>
             </div>
           </div>
-          <hr style="margin: 10px 0;">
+          <hr style="margin:10px 0;">
           <span class="help-block text-center">&copy; 2026 Gadec Software. This work is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">Creative Commons Attribution-NonCommercial-ShareAlike 4.0</a>. Any commercial use of this work, including reselling in kit or assembled form, is prohibited.</span>
+        </div>
+
+        <div class="floating-footer">
+          <div class="footer-inner">
+            <button id="save" name="save" class="btn btn-primary" type="submit">Save Settings</button>
+          </div>
         </div>
       </fieldset>
     </form>
@@ -255,6 +304,7 @@
       stationLongitude: 0,
       platformFilter: "",
       platformFilterOK: true,
+      nrTimeOffset: 0,
       tubeName: "",
       tubeId: "",
       busName: "",
@@ -289,7 +339,8 @@
       validNatRailToken: true,
       firmwareVersion: "",
       jsonSettings: {},
-      atcoHistory: []
+      atcoHistory: [],
+      rssFeeds: []
     };
 
     const elements = {
@@ -322,7 +373,9 @@
       optTZ: document.getElementById("optTZ"),
       customTZ: document.getElementById("customTZ"),
       optHost: document.getElementById("optHost"),
-      customHost: document.getElementById("customHost")
+      customHost: document.getElementById("customHost"),
+      nrTimeOffset: document.getElementById("nrTimeOffset"),
+      rssFeedList: document.getElementById("rssFeedList")
     };
 
     const busFilterError = "Please enter a valid list of bus services to filter on, or leave blank for all services.";
@@ -343,10 +396,55 @@
       }
     }
 
+    function populateOffsetTime(selectId) {
+      const select = document.getElementById(selectId);
+      for (let mins=-60;mins<=120;mins+=15) {
+        if (mins===120) mins=119;
+        const option = document.createElement("option");
+        option.value = mins;
+        if (mins===0) option.textContent = "none (default)";
+        else option.textContent = String(mins) + " minutes";
+        select.appendChild(option);
+      }
+    }
+
     populateHoursSelect("altStart");
     populateHoursSelect("altEnd");
     populateHoursSelect("sleepStart");
     populateHoursSelect("sleepEnd");
+    populateOffsetTime("nrTimeOffset");
+
+    async function fetchRssFeeds() {
+      try {
+        const response = await fetch('/rss.json');
+        if (!response.ok) {
+          return;
+        }
+        appState.rssFeeds =  await response.json();
+        renderRssFeeds();
+      } catch {
+        return;
+      }
+    }
+
+    function renderRssFeeds() {
+      const list = appState.rssFeeds;
+
+      const datalist = document.getElementById("rssFeedList");
+      datalist.innerHTML = "";
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "None (no headlines)";
+      datalist.appendChild(option);
+
+      list.forEach(item => {
+        const option = document.createElement("option");
+        option.value = item.url;
+        option.textContent = item.name;
+        datalist.appendChild(option);
+      });
+    }
+
 
     async function fetchAtcoHistory() {
       try {
@@ -417,7 +515,7 @@
       list.forEach(item => {
         const option = document.createElement("option");
         option.value = item.atco;
-        option.label = item.name + " (" + item.atco + ")";
+        option.textContent = item.name + " (" + item.atco + ")";
         datalist.appendChild(option);
       });
       show("busAtcoHistory",true);
@@ -572,6 +670,10 @@
       };
     };
 
+    $(function () {
+      $('[data-toggle="tooltip"]').tooltip();
+    });
+
     $(elements.searchName).typeahead({
       name: 'stations',
       source: substringMatcher(),
@@ -669,6 +771,7 @@
     elements.customHost.addEventListener("blur",validateHostname);
 
     document.addEventListener("DOMContentLoaded", async () => {
+      await fetchRssFeeds();
       await fetchConfig();
       await fetchFirmware();
       await fetchApiKeys();
@@ -699,7 +802,7 @@
         if (contentType === "application/json") {
           const jsonInfo = await response.json();
           appState.firmwareVersion = jsonInfo.firmware || "";
-          elements.fwinfo.innerHTML = '<a href="https://github.com/gadec-uk/departures-board#readme" target="_blank">Firmware: ' + appState.firmwareVersion + '</a>';
+          elements.fwinfo.innerHTML = '<a href="https://github.com/gadec-uk/departures-board/releases" target="_blank">Firmware: ' + appState.firmwareVersion + '</a>';
         }
       } catch (err) {
         console.error("Firmware fetch error:", err);
@@ -804,9 +907,12 @@
         show("nrAtt", rail);
         show("nrAltStation", rail);
         show("optBuses", rail);
+        show("optShowPlatform", rail);
         show("optWeather", rail || bus);
         show("optFastRefresh", rail);
         show("optNoScroll", rail || tube);
+        show("optRssFeed", rail || tube);
+        show("optNrTimeOffset", rail);
         show("nrInvalidToken", mode === 0 && !appState.validNatRailToken);
 
         show("tflT", tube);
@@ -914,7 +1020,9 @@
       setCheckbox("showDate", s.showDate);
       setCheckbox("enableBuses", s.showBus);
       setCheckbox("enableFirmware", s.update);
+      setCheckbox("enableFirmwareDaily",s.updateDaily);
       setCheckbox("enableWeather", s.weather);
+      setCheckbox("showPlatform", !(s.hidePlatform || false));
       setCheckbox("enableFastRefresh", s.fastRefresh);
       setCheckbox("noScrolling", s.noScroll);
       setCheckbox("optFlip", s.flip);
@@ -923,6 +1031,8 @@
       $('#sleepEnd').val(s.sleepEnds);
       $('#altStart').val(appState.altStarts);
       $('#altEnd').val(appState.altEnds);
+      $('#nrTimeOffset').val(s.nrTimeOffset || 0);
+      $('#rssFeedList').val(s.rssUrl || "");
 
       toggleSleepSelectors();
       toggleAltSelectors();
@@ -1068,7 +1178,9 @@
       s.showDate = isChecked("showDate");
       s.showBus = isChecked("enableBuses");
       s.update = isChecked("enableFirmware");
+      s.updateDaily = isChecked("enableFirmwareDaily");
       s.weather = isChecked("enableWeather");
+      s.hidePlatform = !isChecked("showPlatform");
       s.fastRefresh = isChecked("enableFastRefresh");
       s.noScroll = isChecked("noScrolling");
       s.flip = isChecked("optFlip");
@@ -1083,6 +1195,10 @@
       s.altCallingStation = appState.altCallingStation;
       s.altCallingCrs = appState.altCallingCrs;
       s.altPlatformFilter = appState.altPlatformFilter;
+      s.nrTimeOffset = parseInt(elements.nrTimeOffset.value);
+      s.rssUrl = elements.rssFeedList.value;
+      var selectedText = document.querySelector("#rssFeedList option:checked").textContent;
+      s.rssName = selectedText;
       if (appState.busIdOK) {
         s.busName = appState.busName;
         s.busId = appState.busId;

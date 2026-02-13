@@ -45,14 +45,15 @@ int raildataXmlClient::init(const char *wsdlHost, const char *wsdlAPI, rdCallbac
 
     WiFiClientSecure httpsClient;
     httpsClient.setInsecure();
-    httpsClient.setTimeout(15000);
+    httpsClient.setTimeout(5000);
+    httpsClient.setConnectionTimeout(3000);
 
     int retryCounter=0; //retry counter
-    while((!httpsClient.connect(wsdlHost, 443)) && (retryCounter < 30)){
+    while((!httpsClient.connect(wsdlHost, 443)) && (retryCounter < 10)){
         delay(100);
         retryCounter++;
     }
-    if(retryCounter==30) {
+    if(retryCounter>=10) {
       return UPD_NO_RESPONSE;   // No response within 3s
     }
 
@@ -256,7 +257,7 @@ void raildataXmlClient::cleanFilter(const char* rawFilter, char* cleanedFilter, 
 //
 // Updates the Departure Board data from the SOAP API
 //
-int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms) {
+int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms, int timeOffset) {
 
     unsigned long perfTimer=millis();
     bool bChunked = false;
@@ -291,15 +292,16 @@ int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *message
 
     WiFiClientSecure httpsClient;
     httpsClient.setInsecure();
-    httpsClient.setTimeout(15000);
+    httpsClient.setTimeout(5000);
+    httpsClient.setConnectionTimeout(5000);
     httpsClient.setNoDelay(false);
 
     int retryCounter=0; //retry counter
-    while((!httpsClient.connect(soapHost, 443)) && (retryCounter < 30)) {
+    while((!httpsClient.connect(soapHost, 443)) && (retryCounter < 10)) {
         delay(100);
         retryCounter++;
     }
-    if(retryCounter>=30) {
+    if(retryCounter>=10) {
         lastErrorMessage = F("Timed out, no response from connect");    // No response within 3s
         return UPD_NO_RESPONSE;
     }
@@ -312,6 +314,7 @@ int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *message
     if (callingCrsCode[0]) {
         data += "<ns0:filterCrs>" + String(callingCrsCode) + F("</ns0:filterCrs><ns0:filterType>to</ns0:filterType>");
     }
+    if (timeOffset) data += "<ns0:timeOffset>" + String(timeOffset) + F("</ns0:timeOffset>");
     data += F("</ns0:GetDepBoardWithDetailsRequest></soap-env:Body></soap-env:Envelope>");
 
     httpsClient.print("POST " + String(soapAPI) + F(" HTTP/1.1\r\n") +
@@ -356,7 +359,7 @@ int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *message
             // Headers received
             break;
         }
-        yield();
+        delay(1);
     }
 
     xmlStreamingParser parser;
@@ -389,13 +392,12 @@ int raildataXmlClient::updateDepartures(rdStation *station, stnMessages *message
                 Xcb(2,xStation.numServices);    // Callback progress
                 ticker = millis()+800;
             }
-//            yield();
         }
         if (millis()>ticker) {
             Xcb(2,id);      // Callback with progress
             ticker = millis()+800;
         }
-        delay(50);
+        delay(5);
     }
 
     httpsClient.stop();
@@ -567,6 +569,7 @@ void raildataXmlClient::sanitiseData() {
     pruneFromPhrase(xMessages.messages[i]," More details ");
     pruneFromPhrase(xMessages.messages[i]," Latest information ");
     pruneFromPhrase(xMessages.messages[i]," Further information ");
+    pruneFromPhrase(xMessages.messages[i]," More information can ");
 
     fixFullStop(xMessages.messages[i]);
   }

@@ -1,0 +1,12 @@
+[
+    {"name":"BBC News","url":"https://feeds.bbci.co.uk/news/rss.xml?edition=uk"},
+    {"name":"BBC Business News","url":"https://feeds.bbci.co.uk/news/business/rss.xml"},
+    {"name":"BBC Technology News","url":"https://feeds.bbci.co.uk/news/technology/rss.xml"},
+    {"name":"BBC Entertainment & Arts","url":"https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"},
+    {"name":"BBC Sport","url":"https://feeds.bbci.co.uk/sport/rss.xml"},
+    {"name":"The Guardian","url":"https://www.theguardian.com/uk/rss"},
+    {"name":"Yahoo News","url":"https://news.yahoo.com/rss/topstories"},
+    {"name":"Rail News","url":"https://www.railnews.co.uk/rss/news"},
+    {"name":"Railway Gazette","url":"https://www.railwaygazette.com/1360.rss"},
+    {"name":"Network Rail","url":"https://www.networkrailmediacentre.co.uk/feed/rss"}
+]

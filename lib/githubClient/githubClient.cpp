@@ -16,8 +16,9 @@
 #include <LittleFS.h>
 #include <md5Utils.h>
 
-github::github(String token) {
-    accessToken = token;            // Initialise with a GitHub token if the repository is private
+github::github(String repository, String token) {
+    if (repository!="") apiGetLatestRelease = "/repos/" + repository + "/releases/latest";
+    accessToken = token; // Initialise with a GitHub token if the repository is private
 }
 
 bool github::getLatestRelease() {
@@ -28,19 +29,20 @@ bool github::getLatestRelease() {
     WiFiClientSecure httpsClient;
 
     httpsClient.setInsecure();
-    httpsClient.setTimeout(15000);
+    httpsClient.setTimeout(5000);
+    httpsClient.setConnectionTimeout(5000);
 
     int retryCounter=0; //retry counter
-    while((!httpsClient.connect(apiHost, 443)) && (retryCounter < 30)){
+    while((!httpsClient.connect(apiHost, 443)) && (retryCounter < 10)){
         delay(200);
         retryCounter++;
     }
-    if(retryCounter>=30) {
+    if(retryCounter>=10) {
         lastErrorMsg += F("Connection timeout");
         return false;
     }
 
-    String request = "GET "+ String(apiGetLatestRelease) + F(" HTTP/1.0\r\nHost: ") + String(apiHost) + F("\r\nuser-agent: esp32/1.0\r\nX-GitHub-Api-Version: 2022-11-28\r\nAccept: application/vnd.github+json\r\n");
+    String request = "GET " + apiGetLatestRelease + F(" HTTP/1.0\r\nHost: ") + String(apiHost) + F("\r\nuser-agent: esp32/1.0\r\nX-GitHub-Api-Version: 2022-11-28\r\nAccept: application/vnd.github+json\r\n");
     if (accessToken.length()) request += "Authorization: Bearer " + String(accessToken) + F("\r\n");
     request += F("Connection: close\r\n\r\n");
 
@@ -88,7 +90,7 @@ bool github::getLatestRelease() {
             if (c == '{' || c == '[') isBody = true;
             if (isBody) parser.parse(c);
         }
-        delay(50);
+        delay(5);
     }
     httpsClient.stop();
     if (millis() >= dataSendTimeout) {
@@ -100,104 +102,6 @@ bool github::getLatestRelease() {
 
     return true;
 }
-
-/*
-bool github::downloadAssetToLittleFS(String url, String filename) {
-
-    HTTPClient http;
-    WiFiClientSecure client;
-    bool result = true;
-    int redirectCount = 0;
-    const int maxRedirects = 5;
-
-    lastErrorMsg = "";
-    LittleFS.remove(F("/tempfile"));  // delete any leftover temp file
-
-    client.setInsecure();
-
-    File f = LittleFS.open(F("/tempfile"), "w");
-    if (!f) {
-        lastErrorMsg = F("Failed to create temp file");
-        return false;
-    }
-
-    while (redirectCount < maxRedirects) {
-        http.begin(client, url);
-        http.addHeader(F("Accept"), F("application/octet-stream"));
-        if (accessToken.length()) http.addHeader(F("Authorization"), "Bearer " + accessToken);
-        http.addHeader(F("X-GitHub-Api-Version"), F("2022-11-28"));
-        http.addHeader(F("user-agent"), F("esp32/1.0"));
-        const char * headerkeys[] = { "x-ms-blob-content-md5" };    // GitHub uses x-ms-blob-content-m5d, not x-md5
-        size_t headerkeyssize = sizeof(headerkeys) / sizeof(char*);
-        // track the MD5 hash
-        http.collectHeaders(headerkeys, headerkeyssize);
-
-        int httpCode = http.GET();
-        if (httpCode == HTTP_CODE_OK) {
-            int res = http.writeToStream(&f);
-            if (res <= 0) {
-                lastErrorMsg = "WriteToStream failed. Error: " + http.errorToString(res);
-                result = false;
-            }
-            http.end();
-            break;
-        } else if (httpCode == HTTP_CODE_MOVED_PERMANENTLY ||
-                   httpCode == HTTP_CODE_FOUND ||
-                   httpCode == HTTP_CODE_TEMPORARY_REDIRECT ||
-                   httpCode == HTTP_CODE_PERMANENT_REDIRECT) {
-            // Handle redirect
-            String newUrl = http.getLocation();
-            http.end();  // End current request before retrying
-            if (newUrl.length() == 0) {
-                lastErrorMsg = F("HTTP Redirect without Location header!");
-                result = false;
-                break;
-            }
-            url = newUrl;
-            redirectCount++;
-        } else {
-            lastErrorMsg = "GET failed, error: " + String(httpCode) + " " + http.errorToString(httpCode);
-            result = false;
-            http.end();
-            break;
-        }
-    }
-
-    f.close();
-
-    if (result) {
-        // File downloaded, let's check the MD5 if provided
-        if (http.hasHeader("x-ms-blob-content-md5")) {
-            // Convert the base64 encoded MD5 back to a hex string
-            String md5Server = md5.base64ToHex(String(http.header("x-ms-blob-content-md5")));
-            // Calculate the MD5 of the downloaded file
-            String md5Download = md5.calculateFileMD5("/tempfile");
-            if (md5Download != md5Server) {
-                lastErrorMsg = "\"" + filename.substring(1) + F("\" MD5 mismatch (corruption)");
-                return false;
-            }
-        }
-
-        // File downloaded so delete the old one
-        if (LittleFS.exists(filename)) {
-            if (!LittleFS.remove(filename)) {
-                lastErrorMsg = "Could not delete existing " + filename;
-                return false;
-            }
-        }
-
-        // Rename temp file
-        if (!LittleFS.rename("/tempfile", filename)) {
-            lastErrorMsg = F("Could not rename temp file");
-            return false;
-        }
-        LittleFS.remove(F("/tempfile"));
-        lastErrorMsg = F("Success");
-    }
-
-    return result;
-}
-*/
 
 String github::getLastError() {
     return lastErrorMsg;
