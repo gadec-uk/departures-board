@@ -1,6 +1,6 @@
 # departures-board [![License Badge](https://img.shields.io/badge/BY--NC--SA%204.0%20License-grey?style=flat&logo=creativecommons&logoColor=white)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
-This is an ESP32 based mini Departures Board replicating those at many UK railway stations (using data provided by National Rail's public API), London Underground Arrivals boards (using data provided by TfL) and UK wide bus stops (using data provided by bustimes.org). This implementation uses a 3.12" OLED display panel with SSD1322 display controller onboard. STL files are also provided for 3D printing the custom desktop case. A small number of pre-assembled departure boards are also available exclusively from our [store](https://store.gadec.co.uk).
+This is an ESP32 based Departures Board replicating those at many UK railway stations (using data provided by National Rail's public API), London Underground Arrivals boards (using data provided by TfL) and UK wide bus stops (using data provided by bustimes.org). This implementation uses a 3.12" OLED display panel with SSD1322 display controller onboard. STL files are also provided for 3D printing the custom desktop case. A small number of pre-assembled departure boards are also available exclusively from our [store](https://store.gadec.co.uk).
 
 A model railway (00 gauge) version of this project is also available [here](https://github.com/gadec-uk/tiny-departures-board).
 
