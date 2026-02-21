@@ -60,6 +60,8 @@ Solder the 4 SPI connections, plus power and ground. The wires **MUST** be solde
 
 The project uses the Arduino framework and the ESP32 v3.2.0 core. If you want to build from source, you'll need [PlatformIO](https://platformio.org).
 
+The easiest way to install the firmware for the first time is to use the online web based installer [here](https://departures-board.github.io). You will need to use Chrome or Edge as your browser as Safari/Firefox do not support Web Serial.
+
 Alternatively, you can download pre-compiled firmware images from the [releases](https://github.com/gadec-uk/departures-board/releases). These can be installed over the USB serial connection using [esptool](https://github.com/espressif/esptool). If you have python installed, install with *pip install esptool*. For convenience, a pre-compiled executable version for Windows is included [here](https://github.com/gadec-uk/departures-board/tree/main/esptool).
 
 If the board is not recognised you are probably using a version with the CP2104 USB-to-Serial chip. Drivers for the CP2104 are [here](https://www.silabs.com/developer-tools/usb-to-uart-bridge-vcp-drivers?tab=downloads)
