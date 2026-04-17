@@ -11,6 +11,7 @@
 #pragma once
 #include <xmlListener.h>
 #include <xmlStreamingParser.h>
+#include <sharedDataStructs.h>
 #include <responseCodes.h>
 
 #define MAX_RSS_TITLES 5
@@ -20,13 +21,8 @@ class rssClient: public xmlListener {
 
     private:
 
-        String grandParentTagName = "";
-        String parentTagName = "";
-        String tagName = "";
-        String tagPath = "";
         int tagLevel = 0;
-        String currentPath = "";
-        String lastErrorMessage = "";
+        sharedBufferSpace* js = nullptr;
 
         void trim(char* str);
 
@@ -38,9 +34,8 @@ class rssClient: public xmlListener {
 
     public:
 
-        rssClient();
+        rssClient(sharedBufferSpace *sharedBuffer);
         int loadFeed(String url);
-        String getLastError();
         char rssTitle[MAX_RSS_TITLES][MAX_RSS_TITLE_SIZE];
         int numRssTitles = 0;
 };

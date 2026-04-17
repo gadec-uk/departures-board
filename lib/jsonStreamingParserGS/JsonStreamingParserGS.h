@@ -26,7 +26,7 @@ See more at http://blog.squix.ch and https://github.com/squix78/json-streaming-p
 #pragma once
 
 #include <Arduino.h>
-#include "JsonListener.h"
+#include "JsonListenerGS.h"
 
 #define STATE_START_DOCUMENT     0
 #define STATE_DONE               -1
@@ -51,14 +51,14 @@ See more at http://blog.squix.ch and https://github.com/squix78/json-streaming-p
 
 #define BUFFER_MAX_LENGTH  512
 
-class JsonStreamingParser {
+class JsonStreamingParserGS {
   private:
 
 
     int state;
     int stack[20];
     int stackPos = 0;
-    JsonListener* myListener;
+    JsonListenerGS* myListener;
 
     boolean doEmitWhitespace = false;
     // fixed length buffer array to prepare for c code
@@ -128,8 +128,8 @@ class JsonStreamingParser {
 
 
   public:
-    JsonStreamingParser();
+    JsonStreamingParserGS();
     void parse(char c);
-    void setListener(JsonListener* listener);
+    void setListener(JsonListenerGS* listener);
     void reset();
 };

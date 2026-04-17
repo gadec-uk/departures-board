@@ -15,7 +15,7 @@
 #include <WiFiClientSecure.h>
 #include <WiFiClient.h>
 
-rssClient::rssClient() {}
+rssClient::rssClient(sharedBufferSpace *sharedBuffer) : js(sharedBuffer) {}
 
 // Trim leading and trailing spaces in-place
 void rssClient::trim(char* str) {
@@ -43,13 +43,12 @@ int rssClient::loadFeed(String url) {
     int redirectCount = 0;
     const int maxRedirects = 5;
 
-    lastErrorMessage = F("Success");
     clientSecure.setInsecure();
     http.setReuse(false);
     numRssTitles = 0;
 
     while (redirectCount < maxRedirects) {
-        if (url.startsWith(F("https"))) http.begin(clientSecure,url);
+        if (url.startsWith("https")) http.begin(clientSecure,url);
         else http.begin(client, url);
         int httpCode = http.GET();
         if (httpCode == HTTP_CODE_OK) {
@@ -57,9 +56,9 @@ int rssClient::loadFeed(String url) {
             xmlStreamingParser parser;
             parser.setListener(this);
             parser.reset();
-            grandParentTagName = "";
-            parentTagName = "";
-            tagName = "";
+            js->currentKey[0] = '\0';
+            js->objectCurrentKey[0] = '\0';
+            js->currentPath[0] = '\0';
             tagLevel = 0;
             long dataReceived = 0;
             char c;
@@ -76,11 +75,8 @@ int rssClient::loadFeed(String url) {
 
             http.end();
             if (millis() >= dataSendTimeout) {
-                lastErrorMessage += F("Timed out during data receive operation - ");
-                lastErrorMessage += String(dataReceived) + F(" bytes received");
                 return UPD_TIMEOUT;
             }
-            lastErrorMessage = "Success: " + String(dataReceived) + F(" bytes took ") + String(millis()-perfTimer) + F("ms with ") + String(redirectCount) + F(" redirects");
             return UPD_SUCCESS;
             break;
         } else if (httpCode == HTTP_CODE_MOVED_PERMANENTLY ||
@@ -91,14 +87,12 @@ int rssClient::loadFeed(String url) {
             String newUrl = http.getLocation();
             http.end();  // End current request before retrying
             if (newUrl.length() == 0) {
-                lastErrorMessage = F("HTTP Redirect without Location header!");
                 return UPD_HTTP_ERROR;
                 break;
             }
             url = newUrl;
             redirectCount++;
         } else {
-            lastErrorMessage = "GET failed, error: " + String(httpCode) + " " + http.errorToString(httpCode);
             http.end();
             return UPD_HTTP_ERROR;
             break;
@@ -108,25 +102,21 @@ int rssClient::loadFeed(String url) {
     return UPD_SUCCESS;
 }
 
-String rssClient::getLastError() {
-    return lastErrorMessage;
-}
-
 void rssClient::startTag(const char *tag)
 {
     tagLevel++;
-    grandParentTagName = parentTagName;
-    parentTagName = tagName;
-    tagName = String(tag);
-    tagPath = grandParentTagName + "/" + parentTagName + "/" + tagName;
+    strcpy(js->arrayName,js->objectCurrentKey);
+    strcpy(js->objectCurrentKey,js->currentKey);
+    strlcpy(js->currentKey, tag, MAXKEYNAMESIZE);
+    sprintf(js->currentPath,"%s/%s",js->objectCurrentKey,js->currentKey);
 }
 
 void rssClient::endTag(const char *tag)
 {
     tagLevel--;
-    tagName = parentTagName;
-    parentTagName=grandParentTagName;
-    grandParentTagName="??";
+    strcpy(js->currentKey,js->objectCurrentKey);
+    strcpy(js->objectCurrentKey,js->arrayName);
+    js->arrayName[0] = '\0';
 }
 
 void rssClient::parameter(const char *param)
@@ -135,9 +125,8 @@ void rssClient::parameter(const char *param)
 
 void rssClient::value(const char *value)
 {
-    if (tagPath.endsWith("/item/title")) {
-        strncpy(rssTitle[numRssTitles],value,MAX_RSS_TITLE_SIZE-1);
-        rssTitle[numRssTitles][MAX_RSS_TITLE_SIZE-1] = '\0';
+    if (strcmp(js->currentPath, "item/title") == 0) {
+        strlcpy(rssTitle[numRssTitles],value,MAX_RSS_TITLE_SIZE);
         trim(rssTitle[numRssTitles]);
         numRssTitles++;
     }

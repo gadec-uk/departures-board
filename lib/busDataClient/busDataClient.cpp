@@ -10,10 +10,9 @@
  */
 
 #include <busDataClient.h>
-#include <JsonListener.h>
 #include <WiFiClientSecure.h>
 
-busDataClient::busDataClient() {}
+busDataClient::busDataClient(busTubeStation *station, sharedBufferSpace *sharedBuffer) : xBusStop(station), js(sharedBuffer) {}
 
 //
 // Strip HTML tag from string
@@ -124,7 +123,8 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
     unsigned long perfTimer=millis();
     long dataReceived = 0;
     bool bChunked = false;
-    lastErrorMsg = "";
+    js->lastResultMessage[0] = '\0';
+
 
     WiFiClientSecure httpsClient;
     httpsClient.setInsecure();
@@ -137,10 +137,10 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
         delay(200);
     }
     if (retryCounter>=10) {
-        lastErrorMsg = F("Connection timeout");
+        strcpy(js->lastResultMessage,"Error: Connect timed out");
         return UPD_NO_RESPONSE;
     }
-    String request = "GET /stops/" + String(locationId) + F("/departures HTTP/1.0\r\nHost: ") + String(apiHost) + F("\r\nConnection: close\r\n\r\n");
+    String request = "GET /stops/" + String(locationId) + "/departures HTTP/1.0\r\nHost: " + String(apiHost) + "\r\nConnection: close\r\n\r\n";
     httpsClient.print(request);
     retryCounter=0;
     while(!httpsClient.available() && retryCounter++ < 40) {
@@ -150,23 +150,20 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
     if (!httpsClient.available()) {
         // no response within 8 seconds so exit
         httpsClient.stop();
-        lastErrorMsg = F("Response timeout");
+        strcpy(js->lastResultMessage,"Error: GET timed out");
         return UPD_TIMEOUT;
     }
 
     // Parse status code
     String statusLine = httpsClient.readStringUntil('\n');
-    if (!statusLine.startsWith(F("HTTP/")) || statusLine.indexOf(F("200 OK")) == -1) {
+    if (!statusLine.startsWith("HTTP/") || statusLine.indexOf("200 OK") == -1) {
         httpsClient.stop();
-
-        if (statusLine.indexOf(F("401")) > 0 || statusLine.indexOf(F("429")) > 0) {
-            lastErrorMsg = F("Not Authorized");
+        strlcpy(js->lastResultMessage,statusLine.c_str(),sizeof(js->lastResultMessage));
+        if (statusLine.indexOf("401") > 0 || statusLine.indexOf("429") > 0) {
             return UPD_UNAUTHORISED;
-        } else if (statusLine.indexOf(F("500")) > 0) {
-            lastErrorMsg = statusLine;
+        } else if (statusLine.indexOf("500") > 0) {
             return UPD_DATA_ERROR;
         } else {
-            lastErrorMsg = statusLine;
             return UPD_HTTP_ERROR;
         }
     }
@@ -174,19 +171,19 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
     // Skip the remaining headers
     while (httpsClient.connected() || httpsClient.available()) {
         String line = httpsClient.readStringUntil('\n');
-        if (line == F("\r")) break;
-        if (line.startsWith(F("Transfer-Encoding:")) && line.indexOf(F("chunked")) >= 0) bChunked=true;
+        if (line == "\r") break;
+        if (line.startsWith("Transfer-Encoding:") && line.indexOf("chunked") >= 0) bChunked=true;
     }
 
     // Start scraping the data
     unsigned long dataSendTimeout = millis() + 10000UL;
     id=0;
     bool maxServicesRead = false;
-    xBusStop.numServices = 0;
+    xBusStop->numServices = 0;
     for (int i=0;i<MAXBOARDSERVICES;i++) {
-        strcpy(xBusStop.service[i].destinationName,"Check front of bus");
-        strcpy(xBusStop.service[i].scheduled,"");
-        strcpy(xBusStop.service[i].expected,"");
+        strcpy(xBusStop->service[i].destinationName,"Check front of bus");
+        strcpy(xBusStop->service[i].scheduled,"");
+        strcpy(xBusStop->service[i].expected,"");
     }
     int parseStep = PBT_START; // looking for the start of data
     int dataColumns = 0;
@@ -228,21 +225,18 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
                             else if (line.substring(0,7)=="<a href" && serviceData) {
                                 // Get the service name from within the hyperlink
                                 serviceId = stripTag(line);
-                                strncpy(xBusStop.service[id].lineName,serviceId.c_str(),MAXBUSLINESIZE-1);
-                                xBusStop.service[id].lineName[MAXBUSLINESIZE-1] = '\0';
+                                strlcpy(xBusStop->service[id].lineName,serviceId.c_str(),MAXLINESIZE);
                             } else {
                                 // must be a service Id without hyperlink
                                 serviceId = line;
-                                strncpy(xBusStop.service[id].lineName,serviceId.c_str(),MAXBUSLINESIZE-1);
-                                xBusStop.service[id].lineName[MAXBUSLINESIZE-1] = '\0';
+                                strlcpy(xBusStop->service[id].lineName,serviceId.c_str(),MAXLINESIZE);
                             }
                             break;
 
                         case PBT_DESTINATION:
                             if (line.indexOf("</td>")>=0) parseStep = PBT_SCHEDULED;
                             else if (line.substring(0,1)!="<") {
-                                strncpy(xBusStop.service[id].destinationName,line.c_str(),MAXLOCATIONSIZE-1);
-                                xBusStop.service[id].destinationName[MAXLOCATIONSIZE-1] = '\0';
+                                strlcpy(xBusStop->service[id].destinationName,line.c_str(),MAXLOCATIONSIZE);
                             } else if (line.indexOf("class=\"vehicle\"")>=0) {
                                 // Get the vehicle details
                                 String vehicle = stripTag(line);
@@ -252,8 +246,8 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
                                     vehicle = vehicle.substring(tikregsep+3);
                                     vehicle.trim();
                                 }
-                                if ((strlen(xBusStop.service[id].destinationName) + vehicle.length() + 3) < sizeof(xBusStop.service[id].destinationName)) {
-                                    sprintf(xBusStop.service[id].destinationName,"%s (%s)",xBusStop.service[id].destinationName,vehicle.c_str());
+                                if ((strlen(xBusStop->service[id].destinationName) + vehicle.length() + 3) < sizeof(xBusStop->service[id].destinationName)) {
+                                    sprintf(xBusStop->service[id].destinationName,"%s (%s)",xBusStop->service[id].destinationName,vehicle.c_str());
                                 }
                             }
                             break;
@@ -261,26 +255,24 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
                         case PBT_SCHEDULED:
                             if (line.indexOf("</td>")>=0) {
                                 if (dataColumns == 4) parseStep = PBT_EXPECTED; else {
-                                    strcpy(xBusStop.service[id].expected,"");
+                                    strcpy(xBusStop->service[id].expected,"");
                                     parseStep = PBT_HEADER;
-                                    if (serviceMatchesFilter(filter,xBusStop.service[id].lineName)) id++;
+                                    if (serviceMatchesFilter(filter,xBusStop->service[id].lineName)) id++;
                                     if (id>=MAXBOARDSERVICES) maxServicesRead=true;
                                 }
                             } else if (line.substring(0,1)!="<") {
-                                strncpy(xBusStop.service[id].scheduled,line.c_str(),sizeof(xBusStop.service[id].scheduled));
-                                xBusStop.service[id].scheduled[sizeof(xBusStop.service[id].scheduled)-1] = '\0';
+                                strlcpy(xBusStop->service[id].scheduled,line.c_str(),sizeof(xBusStop->service[id].scheduled));
                             }
                             break;
 
                         case PBT_EXPECTED:
                             if (line.indexOf("</td>")>=0) {
                                 parseStep = PBT_HEADER;
-                                if (serviceMatchesFilter(filter,xBusStop.service[id].lineName)) id++;
+                                if (serviceMatchesFilter(filter,xBusStop->service[id].lineName)) id++;
                                 if (id>=MAXBOARDSERVICES) maxServicesRead=true;
                             }
                             else if (line.substring(0,1)!="<") {
-                                strncpy(xBusStop.service[id].expected,line.c_str(),sizeof(xBusStop.service[id].expected));
-                                xBusStop.service[id].expected[sizeof(xBusStop.service[id].expected)-1] = '\0';
+                                strlcpy(xBusStop->service[id].expected,line.c_str(),sizeof(xBusStop->service[id].expected));
                             }
                             break;
                     }
@@ -292,28 +284,25 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
 
     httpsClient.stop();
     if (millis() >= dataSendTimeout) {
-        lastErrorMsg = F("Timed out during data receive operation");
+        sprintf(js->lastResultMessage,"Error: Timeout after %d bytes",dataReceived);
         return UPD_TIMEOUT;
     }
 
-    xBusStop.numServices = id;
+    xBusStop->numServices = id;
 
     // Remove &amp; from destination name
-    for (int i=0;i<xBusStop.numServices;i++) replaceWord(xBusStop.service[i].destinationName,"&amp;","&");
+    for (int i=0;i<xBusStop->numServices;i++) replaceWord(xBusStop->service[i].destinationName,"&amp;","&");
 
     // Check if any of the services have changed
-    if (xBusStop.numServices != station->numServices) boardChanged=true;
-    else if (xBusStop.numServices && strcmp(xBusStop.service[0].destinationName,station->service[0].destination) || strcmp(xBusStop.service[0].lineName,station->service[0].via)) boardChanged=true;
+    if (xBusStop->numServices != station->numServices) boardChanged=true;
+    else if (xBusStop->numServices && strcmp(xBusStop->service[0].destinationName,station->service[0].destination) || strcmp(xBusStop->service[0].lineName,station->service[0].via)) boardChanged=true;
 
-    if (bChunked) lastErrorMsg = F("WARNING: Chunked response! ");
     UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
     if (boardChanged) {
-        lastErrorMsg += F("SUCCESS [Primary Service Changed] Update took: ");
-        lastErrorMsg += String(millis() - perfTimer) + F("ms [") + String(dataReceived) + F("] Max stack: ") + String(uxHighWaterMark);
+        sprintf(js->lastResultMessage+strlen(js->lastResultMessage),"OK: UP D:%d T:%d S:%d %s",dataReceived,millis()-perfTimer,uxHighWaterMark,bChunked?"C!":"");
         return UPD_SUCCESS;
     } else {
-        lastErrorMsg += F("SUCCESS Update took: ");
-        lastErrorMsg += String(millis() - perfTimer) + F("ms [") + String(dataReceived) + F("] Max stack: ") + String(uxHighWaterMark);
+        sprintf(js->lastResultMessage+strlen(js->lastResultMessage),"OK: NC D:%d T:%d S:%d %s",dataReceived,millis()-perfTimer,uxHighWaterMark,bChunked?"C!":"");
         return UPD_NO_CHANGE;
     }
 }
@@ -321,33 +310,11 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
 void busDataClient::loadDepartures(rdStation *station) {
     // Update the callers data with the new data
     station->boardChanged = boardChanged;
-    station->numServices = xBusStop.numServices;
-    for (int i=0;i<xBusStop.numServices;i++) {
-        strcpy(station->service[i].destination,xBusStop.service[i].destinationName);
-        strcpy(station->service[i].via,xBusStop.service[i].lineName);
-        strcpy(station->service[i].sTime,xBusStop.service[i].scheduled);
-        strcpy(station->service[i].etd,xBusStop.service[i].expected);
+    station->numServices = xBusStop->numServices;
+    for (int i=0;i<xBusStop->numServices;i++) {
+        strcpy(station->service[i].destination,xBusStop->service[i].destinationName);
+        strcpy(station->service[i].via,xBusStop->service[i].lineName);
+        strcpy(station->service[i].sTime,xBusStop->service[i].scheduled);
+        strcpy(station->service[i].etd,xBusStop->service[i].expected);
     }
 }
-
-void busDataClient::whitespace(char c) {}
-
-void busDataClient::startDocument() {}
-
-void busDataClient::key(String key) {
-    currentKey = key;
-}
-
-void busDataClient::value(String value) {
-    if (currentKey == F("long_name")) longName = value;
-}
-
-void busDataClient::endArray() {}
-
-void busDataClient::endObject() {}
-
-void busDataClient::endDocument() {}
-
-void busDataClient::startArray() {}
-
-void busDataClient::startObject() {}

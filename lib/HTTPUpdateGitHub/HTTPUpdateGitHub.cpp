@@ -103,7 +103,7 @@
   *  - optionally pass GitHub token for downloads from private repository.
   *  - handles redirects correctly.
   */
-  HTTPUpdateResult HTTPUpdate::handleUpdate(WiFiClient& client, const String& uri = "/", const String& token = "") {
+  HTTPUpdateResult HTTPUpdate::handleUpdate(WiFiClient& client, const String& uri = "/") {
 
      HTTPUpdateResult ret = HTTP_UPDATE_FAILED;
 
@@ -129,7 +129,7 @@
         http.addHeader("Cache-Control", "no-cache");
         // Additional headers for GitHub
         http.addHeader("Accept", "application/octet-stream");
-        if (token.length()) http.addHeader("Authorization", "Bearer " + token);
+        if (strlen(GITHUBTOKEN)) http.addHeader("Authorization", "Bearer " GITHUBTOKEN);
         http.addHeader("X-GitHub-Api-Version", "2022-11-28");
 
         const char * headerkeys[] = { "x-ms-blob-content-md5" };    // GitHub uses x-ms-blob-content-m5d, not x-md5

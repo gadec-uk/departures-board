@@ -70,7 +70,7 @@
          _rebootOnUpdate = reboot;
      }
 
-     HTTPUpdateResult handleUpdate(WiFiClient& client, const String& uri, const String& token);
+     HTTPUpdateResult handleUpdate(WiFiClient& client, const String& uri);
 
      // Notification callbacks
      void onStart(HTTPUpdateStartCB cbOnStart)          { _cbStart = cbOnStart; }

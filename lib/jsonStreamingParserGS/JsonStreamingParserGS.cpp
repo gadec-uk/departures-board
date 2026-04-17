@@ -23,13 +23,13 @@ SOFTWARE.
 See more at http://blog.squix.ch and https://github.com/squix78/json-streaming-parser
 */
 
-#include "JsonStreamingParser.h"
+#include "JsonStreamingParserGS.h"
 
-JsonStreamingParser::JsonStreamingParser() {
+JsonStreamingParserGS::JsonStreamingParserGS() {
     reset();
 }
 
-void JsonStreamingParser::reset() {
+void JsonStreamingParserGS::reset() {
     state = STATE_START_DOCUMENT;
     bufferPos = 0;
     unicodeEscapeBufferPos = 0;
@@ -38,11 +38,11 @@ void JsonStreamingParser::reset() {
     stackPos = 0;
 }
 
-void JsonStreamingParser::setListener(JsonListener* listener) {
+void JsonStreamingParserGS::setListener(JsonListenerGS* listener) {
   myListener = listener;
 }
 
-void JsonStreamingParser::parse(char c) {
+void JsonStreamingParserGS::parse(char c) {
     //System.out.print(c);
     // valid whitespace characters in JSON (from RFC4627 for JSON) include:
     // space, horizontal tab, line feed or new line, and carriage return.
@@ -204,20 +204,20 @@ void JsonStreamingParser::parse(char c) {
     characterCounter++;
   }
 
-void JsonStreamingParser::increaseBufferPointer() {
+void JsonStreamingParserGS::increaseBufferPointer() {
   bufferPos = min(bufferPos + 1, BUFFER_MAX_LENGTH - 1);
 }
 
-void JsonStreamingParser::endString() {
+void JsonStreamingParserGS::endString() {
     int popped = stack[stackPos - 1];
     stackPos--;
     if (popped == STACK_KEY) {
       buffer[bufferPos] = '\0';
-      myListener->key(String(buffer));
+      myListener->key(buffer);
       state = STATE_END_KEY;
     } else if (popped == STACK_STRING) {
       buffer[bufferPos] = '\0';
-      myListener->value(String(buffer));
+      myListener->value(buffer);
       state = STATE_AFTER_VALUE;
     } else {
       // throw new ParsingError($this->_line_number, $this->_char_number,
@@ -225,7 +225,7 @@ void JsonStreamingParser::endString() {
     }
     bufferPos = 0;
   }
-void JsonStreamingParser::startValue(char c) {
+void JsonStreamingParserGS::startValue(char c) {
     if (c == '[') {
       startArray();
     } else if (c == '{') {
@@ -252,12 +252,12 @@ void JsonStreamingParser::startValue(char c) {
     }
   }
 
-boolean JsonStreamingParser::isDigit(char c) {
+boolean JsonStreamingParserGS::isDigit(char c) {
     // Only concerned with the first character in a number.
     return (c >= '0' && c <= '9') || c == '-';
   }
 
-void JsonStreamingParser::endArray() {
+void JsonStreamingParserGS::endArray() {
     int popped = stack[stackPos - 1];
     stackPos--;
     if (popped != STACK_ARRAY) {
@@ -271,13 +271,13 @@ void JsonStreamingParser::endArray() {
     }
   }
 
-void JsonStreamingParser::startKey() {
+void JsonStreamingParserGS::startKey() {
     stack[stackPos] = STACK_KEY;
     stackPos++;
     state = STATE_IN_STRING;
   }
 
-void JsonStreamingParser::endObject() {
+void JsonStreamingParserGS::endObject() {
     int popped = stack[stackPos];
     stackPos--;
     if (popped != STACK_OBJECT) {
@@ -291,7 +291,7 @@ void JsonStreamingParser::endObject() {
     }
   }
 
-void JsonStreamingParser::processEscapeCharacters(char c) {
+void JsonStreamingParserGS::processEscapeCharacters(char c) {
     if (c == '"') {
       buffer[bufferPos] = '"';
       increaseBufferPointer();
@@ -327,7 +327,7 @@ void JsonStreamingParser::processEscapeCharacters(char c) {
     }
   }
 
-void JsonStreamingParser::processUnicodeCharacter(char c) {
+void JsonStreamingParserGS::processUnicodeCharacter(char c) {
     if (!isHexCharacter(c)) {
       // throw new ParsingError($this->_line_number, $this->_char_number,
       // "Expected hex character for escaped Unicode character. Unicode parsed: "
@@ -363,11 +363,11 @@ void JsonStreamingParser::processUnicodeCharacter(char c) {
       }*/
     }
   }
-boolean JsonStreamingParser::isHexCharacter(char c) {
+boolean JsonStreamingParserGS::isHexCharacter(char c) {
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
   }
 
-int JsonStreamingParser::getHexArrayAsDecimal(char hexArray[], int length) {
+int JsonStreamingParserGS::getHexArrayAsDecimal(char hexArray[], int length) {
     int result = 0;
     for (int i = 0; i < length; i++) {
       char current = hexArray[length - i - 1];
@@ -384,7 +384,7 @@ int JsonStreamingParser::getHexArrayAsDecimal(char hexArray[], int length) {
     return result;
   }
 
-boolean JsonStreamingParser::doesCharArrayContain(char myArray[], int length, char c) {
+boolean JsonStreamingParserGS::doesCharArrayContain(char myArray[], int length, char c) {
     for (int i = 0; i < length; i++) {
       if (myArray[i] == c) {
         return true;
@@ -393,7 +393,7 @@ boolean JsonStreamingParser::doesCharArrayContain(char myArray[], int length, ch
     return false;
   }
 
-void JsonStreamingParser::endUnicodeSurrogateInterstitial() {
+void JsonStreamingParserGS::endUnicodeSurrogateInterstitial() {
     char unicodeEscape = unicodeEscapeBuffer[unicodeEscapeBufferPos - 1];
     if (unicodeEscape != 'u') {
       // throw new ParsingError($this->_line_number, $this->_char_number,
@@ -405,7 +405,7 @@ void JsonStreamingParser::endUnicodeSurrogateInterstitial() {
     state = STATE_UNICODE;
   }
 
-void JsonStreamingParser::endNumber() {
+void JsonStreamingParserGS::endNumber() {
     buffer[bufferPos] = '\0';
     String value = String(buffer);
     //float result = 0.0;
@@ -420,7 +420,7 @@ void JsonStreamingParser::endNumber() {
     state = STATE_AFTER_VALUE;
   }
 
-int JsonStreamingParser::convertDecimalBufferToInt(char myArray[], int length) {
+int JsonStreamingParserGS::convertDecimalBufferToInt(char myArray[], int length) {
     int result = 0;
     for (int i = 0; i < length; i++) {
       char current = myArray[length - i - 1];
@@ -429,12 +429,12 @@ int JsonStreamingParser::convertDecimalBufferToInt(char myArray[], int length) {
     return result;
   }
 
-void JsonStreamingParser::endDocument() {
+void JsonStreamingParserGS::endDocument() {
     myListener->endDocument();
     state = STATE_DONE;
   }
 
-void JsonStreamingParser::endTrue() {
+void JsonStreamingParserGS::endTrue() {
     buffer[bufferPos] = '\0';
     String value = String(buffer);
     if (value.equals("true")) {
@@ -447,7 +447,7 @@ void JsonStreamingParser::endTrue() {
     state = STATE_AFTER_VALUE;
   }
 
-void JsonStreamingParser::endFalse() {
+void JsonStreamingParserGS::endFalse() {
     buffer[bufferPos] = '\0';
     String value = String(buffer);
     if (value.equals("false")) {
@@ -460,7 +460,7 @@ void JsonStreamingParser::endFalse() {
     state = STATE_AFTER_VALUE;
   }
 
-void JsonStreamingParser::endNull() {
+void JsonStreamingParserGS::endNull() {
     buffer[bufferPos] = '\0';
     String value = String(buffer);
     if (value.equals("null")) {
@@ -473,33 +473,33 @@ void JsonStreamingParser::endNull() {
     state = STATE_AFTER_VALUE;
   }
 
-void JsonStreamingParser::startArray() {
+void JsonStreamingParserGS::startArray() {
     myListener->startArray();
     state = STATE_IN_ARRAY;
     stack[stackPos] = STACK_ARRAY;
     stackPos++;
   }
 
-void JsonStreamingParser::startObject() {
+void JsonStreamingParserGS::startObject() {
     myListener->startObject();
     state = STATE_IN_OBJECT;
     stack[stackPos] = STACK_OBJECT;
     stackPos++;
   }
 
-void JsonStreamingParser::startString() {
+void JsonStreamingParserGS::startString() {
     stack[stackPos] = STACK_STRING;
     stackPos++;
     state = STATE_IN_STRING;
   }
 
-void JsonStreamingParser::startNumber(char c) {
+void JsonStreamingParserGS::startNumber(char c) {
     state = STATE_IN_NUMBER;
     buffer[bufferPos] = c;
     increaseBufferPointer();
   }
 
-void JsonStreamingParser::endUnicodeCharacter(int codepoint) {
+void JsonStreamingParserGS::endUnicodeCharacter(int codepoint) {
     buffer[bufferPos] = convertCodepointToCharacter(codepoint);
     increaseBufferPointer();
     unicodeBufferPos = 0;
@@ -507,7 +507,7 @@ void JsonStreamingParser::endUnicodeCharacter(int codepoint) {
     state = STATE_IN_STRING;
   }
 
-char JsonStreamingParser::convertCodepointToCharacter(int num) {
+char JsonStreamingParserGS::convertCodepointToCharacter(int num) {
     if (num <= 0x7F)
       return (char) (num);
     // if(num<=0x7FF) return (char)((num>>6)+192) + (char)((num&63)+128);

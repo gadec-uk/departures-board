@@ -35,9 +35,19 @@
             <div class="card-body p-4">
                 <form id="formsettings">
                     <div class="mb-4">
-                        <label class="form-label fw-bold" for="nrKey">National Rail Token</label>
+                        <label class="form-label fw-bold" for="rdmDepKey">RDG Live Departure Board API key</label>
+                        <input id="rdmDepKey" type="text" placeholder="Optionally, enter your consumer api key" class="form-control">
+                        <div class="form-text">You will need a <a href="https://raildata.org.uk/dataProduct/P-d81d6eaf-8060-4467-a339-1c833e50cbbe/overview" target="_blank">Live Departure Board (1.1)</a> Consumer Key from Rail Data Marketplace if you want to display National Rail departures. You can register for access free of charge <a href="https://raildata.org.uk/registerPartner" target="_blank">here</a>. Follow the full instructions <a href="https://departures-board.github.io/Departures-Board-API-Keys-Guide.pdf" target="_blank">here</a>.</div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold" for="rdmSvcKey">RDG Service Details API key</label>
+                        <input id="rdmSvcKey" type="text" placeholder="Optionally, enter your consumer api key" class="form-control">
+                        <div class="form-text">If you also want to display additional <i>Last seen at</i> information for National Rail services, you will need a <a href="https://raildata.org.uk/dataProduct/P-4dec1247-d040-4290-80a4-639dfac54a92/overview" target="_blank">Service Details (1.1)</a> Consumer Key from Rail Data Marketplace.</div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold" for="nrKey">National Rail Token (Legacy)</label>
                         <input id="nrKey" type="text" placeholder="Optionally, enter your 36 character token" class="form-control">
-                        <div class="form-text">You will need a National Rail Enquiries Darwin Lite Webservice token if you want to display National Rail departures. Enter the token exactly as received (in the format nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn). You can register for a token free of charge <a href="https://realtime.nationalrail.co.uk/OpenLDBWSRegistration" target="_blank">here</a>.</div>
+                        <div class="form-text">If you have a National Rail Enquiries Darwin Lite Webservice token you can still use the legacy data feed. This feed is likely to be discontinued in the future so we recommend registering with the Rail Data Marketplace (above). Enter the token exactly as received (in the format nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn). You can currently still register for a token free of charge <a href="https://realtime.nationalrail.co.uk/OpenLDBWSRegistration" target="_blank">here</a>.</div>
                     </div>
                     <div class="mb-4">
                         <label class="form-label fw-bold" for="owmKey">OpenWeather Map API Key</label>
@@ -64,6 +74,9 @@
         </div>
     </div>
     <script>
+        let testSvcID = ''; // Store a test ServiceID
+        const keyErrorText = " Please check you have copied your key correctly. It may take up to 30 minutes for a newly created key to become active.\n\nNo changes have been saved.";
+
         $(document).ready(function() {
             const nrKeyPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
             const tflKeyPattern = /^[a-f0-9]{32}$/;
@@ -93,8 +106,57 @@
                 }
             }
 
+            async function validateRdgDepKey(token) {
+                if (token === '') return true;
+
+                try {
+                    const response = await fetch(`https://api1.raildata.org.uk/1010-live-departure-board-dep1_2/LDBWS/api/20220120/GetDepBoardWithDetails/WAT`, {
+                    method: 'GET',
+                    headers: {
+                        'x-apikey': token,
+                        'Accept': 'application/json'
+                    }
+                    });
+
+                    if (!response.ok) return false;
+
+                    const data = await response.json();
+                    if (data.trainServices && data.trainServices.length > 0) {
+                        testSvcID = data.trainServices[0].serviceID; // Grab a serviceID
+                    }
+                    return true;
+                } catch (error) {
+                    console.log(error);
+                    return false;
+                }
+            }
+
+            async function validateRdgSvcKey(token) {
+                if (token === '') return true;
+
+                try {
+                    const response = await fetch(`https://api1.raildata.org.uk/1010-service-details1_2/LDBWS/api/20220120/GetServiceDetails/${testSvcID}`, {
+                    method: 'GET',
+                    headers: {
+                        'x-apikey': token,
+                        'Accept': 'application/json'
+                    }
+                    });
+
+                    return response.ok;
+                } catch (error) {
+                    return false;
+                }
+            }
+
             // Load saved API keys
             $.getJSON('/apikeys.json', function (data) {
+                if (data.rdmDepKey) {
+                    $('#rdmDepKey').val(data.rdmDepKey);
+                }
+                if (data.rdmSvcKey) {
+                    $('#rdmSvcKey').val(data.rdmSvcKey);
+                }
                 if (data.nrToken) {
                     $('#nrKey').val(data.nrToken);
                 }
@@ -104,7 +166,7 @@
                 if (data.appKey) {
                     $('#appKey').val(data.appKey);
                 }
-                // Validate after loading
+                // Validate legacy key after loading
                 validateKeys();
                 $('#cancel').prop('disabled', false);
             });
@@ -118,6 +180,8 @@
 
             $('#save').click(async function () {
                 const $btn = $(this);
+                const rdmDepKey = $('#rdmDepKey').val().trim();
+                const rdmSvcKey = $('#rdmSvcKey').val().trim();
                 const nrToken = $('#nrKey').val().trim();
                 const owmToken = $('#owmKey').val().trim();
                 const appKey = $('#appKey').val().trim();
@@ -125,12 +189,30 @@
                 $btn.prop('disabled', true);
                 const isOwmValid = await validateOwmKey(owmToken);
                 if (!isOwmValid) {
-                    await bsAlert("The OpenWeather Map API key is not valid. Please check you have copied your key correctly. It may take up to 30 minutes for a newly created key to become active.\n\nNo changes have been saved.");
+                    await bsAlert(`The <b>OpenWeather Map</b> API key is not valid.${keyErrorText}`);
                     $btn.prop('disabled', false);
                     return;
                 }
 
+                const isRdgDepValid = await validateRdgDepKey(rdmDepKey);
+                if (!isRdgDepValid) {
+                    await bsAlert(`The RDG <b>Live Departure Board</b> API key is not valid.${keyErrorText}`);
+                    $btn.prop('disabled', false);
+                    return;
+                }
+
+                if (rdmDepKey != '' && testSvcID != '') {
+                    const isRdgSvcValid = await validateRdgSvcKey(rdmSvcKey);
+                    if (!isRdgSvcValid) {
+                        await bsAlert(`The RDG <b>Service Details</b> API key is not valid.${keyErrorText}`);
+                        $btn.prop('disabled', false);
+                        return;
+                    }
+                }
+
                 const payload = {
+                    rdmDepKey: rdmDepKey,
+                    rdmSvcKey: rdmSvcKey,
                     nrToken: nrToken,
                     owmToken: owmToken,
                     appKey: appKey

@@ -9,13 +9,9 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  */
 #pragma once
-#include <JsonListener.h>
-#include <JsonStreamingParser.h>
-#include <stationData.h>
+#include <sharedDataStructs.h>
 #include <responseCodes.h>
 
-#define MAXBUSLINESIZE 9
-#define BUSMAXREADSERVICES 20
 #define MAXBUSFILTERSIZE 25
 
 #define PBT_START 0
@@ -25,31 +21,17 @@
 #define PBT_SCHEDULED 4
 #define PBT_EXPECTED 5
 
-class busDataClient: public JsonListener {
+class busDataClient {
 
     private:
 
-        struct busService {
-            char destinationName[MAXLOCATIONSIZE];
-            char lineName[MAXBUSLINESIZE];
-            char scheduled[6];
-            char expected[6];
-        };
-
-        struct busStop {
-            int numServices;
-            busService service[BUSMAXREADSERVICES];
-        };
-
         const char* apiHost = "bustimes.org";
-        String currentKey = "";
-        String currentObject = "";
 
         int id=0;
-        String longName;
         bool maxServicesRead = false;
         bool boardChanged = false;
-        busStop xBusStop;
+        busTubeStation* xBusStop = nullptr;
+        sharedBufferSpace* js = nullptr;
 
         String stripTag(String html);
         void replaceWord(char* input, const char* target, const char* replacement);
@@ -58,20 +40,9 @@ class busDataClient: public JsonListener {
         bool serviceMatchesFilter(const char* filter, const char* serviceId);
 
     public:
-        String lastErrorMsg = "";
 
-        busDataClient();
+        busDataClient(busTubeStation *station, sharedBufferSpace *sharedBuffer);
         void cleanFilter(const char* rawFilter, char* cleanedFilter, size_t maxLen);
         int fetchDepartures(rdStation *station, const char *locationId, const char *filter);
         void loadDepartures(rdStation *station);
-
-        virtual void whitespace(char c);
-        virtual void startDocument();
-        virtual void key(String key);
-        virtual void value(String value);
-        virtual void endArray();
-        virtual void endObject();
-        virtual void endDocument();
-        virtual void startArray();
-        virtual void startObject();
 };

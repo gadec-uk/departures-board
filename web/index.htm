@@ -39,6 +39,10 @@
   .custom-tabs .tab-content {padding:8px;background-color:var(--bs-secondary-bg);border-radius:0 15px 15px;}
   .custom-tabs .form-range::-webkit-slider-runnable-track {background-color:var(--bs-gray-500);}
   .custom-tabs .form-range::-moz-range-track {background-color:var(--bs-gray-500);}
+  @media (hover: none) {  /* iOS sticky hover fix */
+    #scheduleTab .btn-outline-secondary:hover {background-color:transparent!important;color:var(--bs-btn-color)!important;border-color:var(--bs-btn-border-color)!important;}
+    #scheduleTab .btn-danger:hover {background-color:var(--bs-btn-bg)!important;border-color:var(--bs-btn-border-color)!important;}
+  }
 </style>
 <body style="padding-bottom:60px;">
   <div style="width:min(90%,500px);margin:0 auto;padding:0 5px;">
@@ -64,11 +68,11 @@
           <label class="form-label">Board Mode</label>
           <div class="btn-group w-100" role="group">
             <input type="radio" class="btn-check" name="boardmode" id="modeRail" value="0" autocomplete="off">
-            <label class="btn btn-outline-secondary" for="modeRail">Rail</label>
+            <label class="btn btn-outline-secondary d-flex align-items-center justify-content-center" for="modeRail"><img src="/irail.webp" class="me-2" alt=""> Rail</label>
             <input type="radio" class="btn-check" name="boardmode" id="modeTube" value="1" autocomplete="off">
-            <label class="btn btn-outline-secondary" for="modeTube">Tube</label>
+            <label class="btn btn-outline-secondary d-flex align-items-center justify-content-center" for="modeTube"><img src="/itube.webp" class="me-2" alt=""> Tube</label>
             <input type="radio" class="btn-check" name="boardmode" id="modeBus" value="2" autocomplete="off">
-            <label class="btn btn-outline-secondary" for="modeBus">Bus</label>
+            <label class="btn btn-outline-secondary d-flex align-items-center justify-content-center" for="modeBus"><img src="/ibus.webp" class="me-2" alt=""> Bus</label>
           </div>
         </div>
 
@@ -77,11 +81,33 @@
           <input id="searchName" type="text" placeholder="Type the station name" class="form-control typeahead">
         </div>
 
-        <div class="mb-3" id="nrInvalidToken" style="display:none">
-          <div class="form-text"
-            style="text-align:center;background-color:black;border-color:red;border-style:solid;border-width:3px;color:white;padding:8px;">
-            You must enter a valid National Rail API token to use Rail Departures mode. Manage your API keys <a
-              href="/keys.htm">here</a>.</div>
+        <div class="mb-3" id="nrCallingBox" style="display:none">
+          <label class="form-label" for="callingStation">Only show services calling at</label>
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;">
+              <input id="callingStation" type="text" placeholder="Station name or leave blank for all services"
+                class="form-control typeahead" style="width:100%;">
+            </div>
+            <div style="flex-shrink:0;">
+              <button id="clearFilter" name="clearFilter" class="btn btn-secondary" type="button">Clear</button>
+            </div>
+          </div>
+          <div id="platformFilterBox" style="margin-top:10px;">
+            <label class="form-label" for="platformFilter">Only show these platforms</label>
+            <input id="platformFilter" type="text" maxlength="24"
+              placeholder="Enter comma separated platform numbers or blank for all" class="form-control">
+          </div>
+        </div>
+
+        <div id="nrInvalidToken" style="display:none;">
+          <div class="alert alert-danger d-flex align-items-center mb-3" role="alert">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-exclamation-triangle-fill flex-shrink-0 me-2" viewBox="0 0 16 16" role="img" aria-label="Warning:">
+              <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+            </svg>
+            <div>
+              You must enter a valid National Rail or Rail Data API token to use Rail Departures mode. Manage your API keys <a href="/keys.htm" class="alert-link">here</a>.
+            </div>
+          </div>
         </div>
 
         <div class="mb-3" id="tflSearchBox" style="display:none">
@@ -102,7 +128,6 @@
               <option value="outbound">Outbound</option>
             </select>
           </div>
-
         </div>
 
         <div class="mb-3" id="busAtcoBox" style="display:none">
@@ -153,74 +178,22 @@
           </div>
         </div>
 
-        <div class="mb-3" id="nrCallingBox" style="display:none">
-          <label class="form-label" for="callingStation">Only show services calling at</label>
+        <div class="mb-3" id="scheduleActionButtons" style="padding-top:15px;">
           <div style="display:flex;gap:10px;">
-            <div style="flex:1;">
-              <input id="callingStation" type="text" placeholder="Station name or leave blank for all services"
-                class="form-control typeahead" style="width:100%;">
-            </div>
-            <div style="flex-shrink:0;">
-              <button id="clearFilter" name="clearFilter" class="btn btn-secondary" type="button">Clear</button>
-            </div>
-          </div>
-          <div id="platformFilterBox" style="margin-top:10px;">
-            <label class="form-label" for="platformFilter">Only show these platforms</label>
-            <input id="platformFilter" type="text" maxlength="24"
-              placeholder="Enter comma separated platform numbers or blank for all" class="form-control">
+            <button id="btnAddToScheduler" class="btn btn-primary" type="button" style="flex:1;">Add to Scheduler</button>
+            <button id="btnAddToCarousel" class="btn btn-primary" type="button" style="flex:1;">Add to Carousel</button>
           </div>
         </div>
 
-        <div class="mb-3" id="nrAltStation" style="display:none">
-          <label class="form-label" for="altStation">Alternate station</label>
-          <div style="display:flex;gap:10px;">
-            <div style="flex:1;">
-              <input id="altStation" type="text" placeholder="Type the station name" class="form-control typeahead"
-                style="width:100%;">
-            </div>
-            <div style="flex-shrink:0;">
-              <button id="clearAltStation" name="clearAltStation" class="btn btn-secondary" type="button">Clear</button>
-            </div>
-          </div>
-
-          <div class="mb-3" id="nrAltCallingBox" style="padding-top:10px;display:none">
-            <label class="form-label" for="altCallingStation">Only show services calling at (alternate active)</label>
-            <div style="display:flex;gap:10px;">
-              <div style="flex:1;">
-                <input id="altCallingStation" type="text" placeholder="Station name or leave blank for all services"
-                  class="form-control typeahead" style="width:100%;">
-              </div>
-              <div style="flex-shrink:0;">
-                <button id="altClearFilter" name="altClearFilter" class="btn btn-secondary" type="button">Clear</button>
-              </div>
-            </div>
-            <div id="altPlatformFilterBox" style="margin-top:10px;">
-              <label class="form-label" for="altPlatformFilter">Only show these platforms (alternate active)</label>
-              <input id="altPlatformFilter" type="text" maxlength="24"
-                placeholder="Enter comma separated platform numbers or blank for all" class="form-control">
-            </div>
-          </div>
-
-          <div class="mb-3" id="altStationTimeSelectors" style="display:none;">
-            <div style="display:flex;gap:10px;">
-              <div style="flex:1;">
-                <label class="form-label" for="altStart">Show alternate from</label>
-                <select id="altStart" class="form-select">
-                </select>
-              </div>
-              <div style="flex:1;">
-                <label class="form-label" for="altEnd">Show default from</label>
-                <select id="altEnd" class="form-select">
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
         <div class="custom-tabs">
           <ul class="nav nav-tabs" style="margin-top:20px;font-weight:bold;" id="optTabs" role="tablist">
             <li class="nav-item" role="presentation">
               <button class="nav-link active" id="options-tab" data-bs-toggle="tab" data-bs-target="#optionsTab"
                 type="button" role="tab" aria-controls="optionsTab" aria-selected="true">Options</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="schedule-tab" data-bs-toggle="tab" data-bs-target="#scheduleTab" type="button"
+                role="tab" aria-controls="scheduleTab" aria-selected="false">Schedule</button>
             </li>
             <li class="nav-item" role="presentation">
               <button class="nav-link" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advancedTab" type="button"
@@ -277,6 +250,21 @@
                   </div>
                 </div>
 
+                <div id="optShowServiceMsgs" style="display:none">
+                  <hr class="my-0 opacity-10">
+                  <div class="py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <label class="form-check-label d-block" for="showServiceMsgs">Show station messages</label>
+                        <div class="small text-body-secondary">Displays station &amp; service status messages</div>
+                      </div>
+                      <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="showServiceMsgs" role="switch">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div id="optShowPlatform" style="display:none">
                   <hr class="my-0 opacity-10">
                   <div class="py-3">
@@ -321,14 +309,46 @@
                   </div>
                 </div>
 
+                <div id="optShowTubeLocation" style="display:none">
+                  <hr class="my-0 opacity-10">
+                  <div class="py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <label class="form-check-label d-block" for="showTubeLocation">Show service current location</label>
+                        <div class="small text-body-secondary">Displays the location of the primary tube service</div>
+                      </div>
+                      <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="showTubeLocation" role="switch">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="optShowFullCalling" style="display:none">
+                  <hr class="my-0 opacity-10">
+                  <div class="py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <label class="form-check-label d-inline-block" for="showFullCalling">Wait for Calling at list to complete</label>
+                        <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right"
+                          title="Waits for the Calling at service list to complete scrolling before changing the primary service on the board. Enable this for busy stations if you want to see the full calling at list for a service."
+                          style="cursor:pointer;"></i>
+                      </div>
+                      <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="showFullCalling" role="switch">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div id="optShowFullMsgs" style="display:none">
                   <hr class="my-0 opacity-10">
                   <div class="py-3">
                     <div class="d-flex justify-content-between align-items-center">
                       <div>
-                        <label class="form-check-label d-inline-block" for="showFullMsgs">Wait for Calling at list to complete</label>
+                        <label class="form-check-label d-inline-block" for="showFullMsgs">Wait for Messages or RSS to complete</label>
                         <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right"
-                          title="Waits for the Calling at service list and other service messages to complete scrolling before changing the primary service on the board."
+                          title="Waits for the current service message or RSS headline feed to complete scrolling before changing the primary service on the board. Useful for busy stations with frequently changing services."
                           style="cursor:pointer;"></i>
                       </div>
                       <div class="form-check form-switch mb-0">
@@ -406,6 +426,35 @@
               </div>
             </div>
 
+            <div class="tab-pane fade" id="scheduleTab" role="tabpanel" aria-labelledby="schedule-tab">
+
+              <div class="mb-3">
+                <div class="py-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <label class="form-check-label d-block fw-bold" for="enableScheduler">Enable scheduler</label>
+                    <div class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox" id="enableScheduler" role="switch">
+                    </div>
+                  </div>
+                </div>
+
+                <label class="form-label">Scheduler List (Maximum 5 entries)</label>
+                <div id="schedulerListContainer" class="list-group mb-3"></div>
+
+                <div class="py-2">
+                  <hr class="mt-0 mb-3 opacity-10">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <label class="form-check-label d-block fw-bold" for="enableCarousel">Enable carousel</label>
+                    <div class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox" id="enableCarousel" role="switch">
+                    </div>
+                  </div>
+                </div>
+
+                <label class="form-label">Carousel List (Maximum 5 entries)</label>
+                <div id="carouselListContainer" class="list-group"></div>
+              </div>
+            </div>
             <div class="tab-pane fade" id="advancedTab" role="tabpanel" aria-labelledby="advanced-tab">
               <div class="mb-3" style="margin-bottom:0;">
 
@@ -414,7 +463,7 @@
                     <div>
                       <label class="form-check-label d-inline-block" for="optTouch">Enable touch sensor</label>
                       <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right"
-                        title="A tap switches between configured modes (or wakes from sleep mode). A long tap switches between the primary and alternate stations in Rail mode."
+                        title="A tap switches between configured modes (or wakes from sleep mode). If the carousel or scheduler mode is active, a tap switches to the next location immediately."
                         style="cursor:pointer;"></i>
                       <div class="small text-body-secondary">Requires an installed TTP223 sensor or button</div>
                     </div>
@@ -496,7 +545,7 @@
                       <div>
                         <label class="form-check-label d-block" for="noScrolling">Suppress calling at / info
                           messages</label>
-                        <div class="small text-body-secondary">Turns off horizontal scrolling and RSS feeds</div>
+                        <div class="small text-body-secondary">Turns off all horizontal scrolling and RSS feeds</div>
                       </div>
                       <div class="form-check form-switch mb-0">
                         <input class="form-check-input" type="checkbox" id="noScrolling" role="switch">
@@ -568,6 +617,18 @@
                   </div>
                 </div>
 
+                <div id="optDataSource" class="mb-3" style="display:none;">
+                  <hr class="mt-0 mb-3 opacity-10">
+                  <div class="d-flex align-items-center">
+                    <label class="form-label mb-0" for="dataSource">Rail data source:</label>
+                    <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right"
+                      title="Select the data source for Rail information. Only sources with API keys entered are shown. Rail Delivery Group is recommended."
+                      style="cursor:pointer;"></i>
+                    <select id="dataSource" class="form-select ms-auto w-auto">
+                    </select>
+                  </div>
+                </div>
+
                 <hr class="my-2 opacity-10">
               </div>
 
@@ -582,6 +643,10 @@
             </div>
             <div id="nrAtt" style="display:none">
               <a href="https://www.nationalrail.co.uk" target="_blank"><img src="/nrelogo.webp" alt="National Rail"
+                  style="max-height:40px;"></a>
+            </div>
+            <div id="rdgAtt" style="display:none">
+              <a href="https://www.raildeliverygroup.com" target="_blank"><img src="/rdglogo.webp" alt="Rail Delivery Group"
                   style="max-height:40px;"></a>
             </div>
             <div id="tflAtt" style="display:none">
@@ -605,6 +670,52 @@
       </fieldset>
     </form>
   </div>
+
+  <div class="modal fade" id="timePromptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Time of Day</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label">Select time for this schedule item:</label>
+          <div style="display:flex;gap:10px;">
+            <select id="scheduleHour" class="form-select">
+              </select>
+            <span style="font-size:1.5rem;">:</span>
+            <select id="scheduleMinute" class="form-select">
+              </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmTime">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="carouselDurationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Carousel Duration</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <label for="carouselDuration" class="form-label">Show this location for:</label>
+          <select id="carouselDuration" class="form-select"><option value="3">3 minutes</option>
+            </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmCarousel">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const appState = {
       stationSelected: false,
@@ -634,25 +745,20 @@
       callingStationSelected: false,
       callingStation: "",
       callingCrs: "",
-      altStationSelected: false,
-      altStation: "",
-      altCrs: "",
-      altLatitude: 0,
-      altLongitude: 0,
-      altStarts: 0,
-      altEnds: 23,
-      altCallingStationSelected: false,
-      altCallingStation: "",
-      altCallingCrs: "",
-      altPlatformFilter: "",
-      altPlatformFilterOK: true,
       tzOK: true,
       hostnameOK: true,
       validNatRailToken: true,
+      validRdgRailToken: true,
+      validRdgServiceToken: true,
+      dataSource: 0,
       firmwareVersion: "",
+      prevFirmwareVersion: "",
+      scheduler: [],
+      carousel: [],
       jsonSettings: {},
       atcoHistory: [],
-      rssFeeds: []
+      rssFeeds: [],
+      jsonPrevFirmware: {}
     };
 
     const elements = {
@@ -665,7 +771,6 @@
       tubeDirectionFilter: document.getElementById("tubeDirectionFilter"),
       callingStation: document.getElementById("callingStation"),
       platformFilter: document.getElementById("platformFilter"),
-      altCallingStation: document.getElementById("altCallingStation"),
       brightness: document.getElementById("brightness"),
       enableSleep: document.getElementById("enableSleep"),
       sleepStart: document.getElementById("sleepStart"),
@@ -673,12 +778,6 @@
       saveButton: document.getElementById("save"),
       clearButton: document.getElementById("clearFilter"),
       fwinfo: document.getElementById("fwinfo"),
-      altStation: document.getElementById("altStation"),
-      clearAltButton: document.getElementById("clearAltStation"),
-      altClearButton: document.getElementById("altClearFilter"),
-      altStart: document.getElementById("altStart"),
-      altEnd: document.getElementById("altEnd"),
-      altPlatformFilter: document.getElementById("altPlatformFilter"),
       verifyAtcoButton: document.getElementById("verifyAtco"),
       busAtco: document.getElementById("busAtco"),
       busLongName: document.getElementById("busAtcoLongName"),
@@ -692,7 +791,15 @@
       optHost: document.getElementById("optHost"),
       customHost: document.getElementById("customHost"),
       nrTimeOffset: document.getElementById("nrTimeOffset"),
-      rssFeedList: document.getElementById("rssFeedList")
+      rssFeedList: document.getElementById("rssFeedList"),
+      dataSource: document.getElementById("dataSource"),
+      scheduleActionButtons: document.getElementById("scheduleActionButtons"),
+      btnAddToScheduler: document.getElementById("btnAddToScheduler"),
+      btnAddToCarousel: document.getElementById("btnAddToCarousel"),
+      schedulerListContainer: document.getElementById("schedulerListContainer"),
+      carouselListContainer: document.getElementById("carouselListContainer"),
+      enableScheduler: document.getElementById('enableScheduler'),
+      enableCarousel: document.getElementById('enableCarousel')
     };
 
     document.getElementById('formsettings').addEventListener('keydown', function(e) { if (e.key === 'Enter') e.preventDefault(); });
@@ -704,6 +811,7 @@
     const MAX_BUS_ATCOS=10;
     const sysErr="System Error";
     const sysName="Departures Board"
+    const githubRepo="https://api.github.com/repos/gadec-uk/departures-board/releases/latest"
 
     const lineDirectionMap = {
       "bakerloo": {inbound:"Southbound",outbound:"Northbound"},
@@ -756,11 +864,42 @@
       }
     }
 
-    populateHoursSelect("altStart");
-    populateHoursSelect("altEnd");
+    function populateSchedulerTimes() {
+      const hrSelect = document.getElementById('scheduleHour');
+      const mnSelect = document.getElementById('scheduleMinute');
+      for (let i = 0; i < 24; i++) {
+          let opt = document.createElement('option');
+          opt.value = opt.text = i.toString().padStart(2, '0');
+          if(hrSelect) hrSelect.add(opt);
+      }
+      for (let i = 0; i < 60; i++) {
+          let opt = document.createElement('option');
+          opt.value = opt.text = i.toString().padStart(2, '0');
+          if(mnSelect) mnSelect.add(opt);
+      }
+    }
+
+    function populateCarouselTimes() {
+      const durationSelect = document.getElementById('carouselDuration');
+      for (let i = 5; i <= 60; i += 5) {
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = `${i} minutes`;
+          durationSelect.appendChild(opt);
+      }
+    }
+
+    populateSchedulerTimes();
+    populateCarouselTimes();
     populateHoursSelect("sleepStart");
     populateHoursSelect("sleepEnd");
     populateOffsetTime("nrTimeOffset");
+
+    function enableSave(isAllowed) {
+      elements.saveButton.disabled = !isAllowed;
+      elements.btnAddToCarousel.disabled = !(isAllowed && appState.carousel.length<5);
+      elements.btnAddToScheduler.disabled = !(isAllowed && appState.scheduler.length<5);
+    }
 
     async function fetchRssFeeds() {
       try {
@@ -882,7 +1021,7 @@
       appState.busIdOK = true;
 
       elements.busLongName.innerHTML = "Location: <b>" + saved.name + "</b>";
-      elements.saveButton.disabled = false;
+      enableSave(true);
       toggleBusFilterBox();
     }
 
@@ -932,16 +1071,6 @@
       else {
         appState.platformFilterOK = true;
         appState.platformFilter = result.value;
-      }
-    }
-
-    async function validateAltPlatformFilter() {
-      const input = elements.altPlatformFilter.value;
-      const result = await validateCSVFilter(input, platformFilterError);
-      if (!result.ok) appState.altPlatformFilterOK = false;
-      else {
-        appState.altPlatformFilterOK = true;
-        appState.altPlatformFilter = result.value;
       }
     }
 
@@ -1030,7 +1159,7 @@
         return item;
       },
       highlighter: function (item) {
-        return '<img src="nr.webp" style="margin-right:6px">' + item;
+        return '<img src="irail.webp" style="margin-right:6px">' + item;
       }
     });
 
@@ -1040,32 +1169,6 @@
       delay: 300,
       updater: function (item) {
         handleCallingStationSelected(item);
-        return item;
-      },
-      highlighter: function (item) {
-        return '<img src="nr.webp" style="margin-right:6px">' + item;
-      }
-    });
-
-    $(elements.altCallingStation).typeahead({
-      name: 'stations',
-      source: substringMatcher(),
-      delay: 300,
-      updater: function (item) {
-        handleAltCallingStationSelected(item);
-        return item;
-      },
-      highlighter: function (item) {
-        return '<img src="nr.webp" style="margin-right:6px">' + item;
-      }
-    });
-
-    $(elements.altStation).typeahead({
-      name: 'stations',
-      source: substringMatcher(),
-      delay: 300,
-      updater: function (item) {
-        handleAltStationSelected(item);
         return item;
       },
       highlighter: function (item) {
@@ -1089,7 +1192,7 @@
     elements.form.addEventListener("submit", async function (e) {
       e.preventDefault();
       if (!appState.busFilterOK) await bsAlert(busFilterError);
-      else if (!appState.platformFilterOK || !appState.altPlatformFilterOK) await bsAlert(platformFilterError);
+      else if (!appState.platformFilterOK) await bsAlert(platformFilterError);
       else if (!appState.tzOK) await bsAlert(tzError);
       else if (!appState.hostnameOK) await bsAlert(hostnameError);
       else handleSave();
@@ -1100,8 +1203,6 @@
     elements.callingStation.addEventListener("focus", () => elements.callingStation.select());
     elements.callingStation.addEventListener("blur", () => setTimeout(handleCallingStationLostFocus, 500));
     elements.platformFilter.addEventListener("blur", validatePlatformFilter);
-    elements.altCallingStation.addEventListener("focus", () => elements.altCallingStation.select());
-    elements.altCallingStation.addEventListener("blur", () => setTimeout(handleAltCallingStationLostFocus, 500));
     elements.searchNameTfL.addEventListener("focus", () => elements.searchNameTfL.select());
     elements.searchNameTfL.addEventListener("blur", () => setTimeout(handleTfLStationLostFocus, 500));
     elements.tubeLineFilter.addEventListener("change", (e) => {
@@ -1119,11 +1220,6 @@
     elements.enableSleep.addEventListener("change", toggleSleepSelectors);
     elements.brightness.addEventListener("change", handleBrightnessChange);
     elements.clearButton.addEventListener("click", handleClearFilter);
-    elements.altClearButton.addEventListener("click", handleAltClearFilter);
-    elements.altStation.addEventListener("focus", () => elements.altStation.select());
-    elements.altStation.addEventListener("blur", () => setTimeout(handleAltStationLostFocus, 500));
-    elements.clearAltButton.addEventListener("click", handleClearAltStation);
-    elements.altPlatformFilter.addEventListener("blur", validateAltPlatformFilter);
     elements.verifyAtcoButton.addEventListener("click", handleVerifyAtco);
     elements.clearHistoryButton.addEventListener("click", handleClearHistory);
     elements.busAtcoHistoryList.addEventListener('change', handleAtcoHistorySelect);
@@ -1133,17 +1229,94 @@
     elements.customTZ.addEventListener("blur", validateTZ);
     elements.optHost.addEventListener("change", () => { show("customHostbox", isChecked("optHost")); if (!isChecked("optHost")) { elements.customHost.value = ""; appState.hostnameOK = true; } });
     elements.customHost.addEventListener("blur", validateHostname);
+    elements.dataSource.addEventListener("change", () => { if (elements.dataSource.value != "") {appState.dataSource = parseInt(elements.dataSource.value); applyBoardMode(); }});
+    elements.enableScheduler.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            elements.enableCarousel.checked = false;
+        }
+    });
+    elements.enableCarousel.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            elements.enableScheduler.checked = false;
+        }
+    });
+
+    let timeModalInstance;
+    elements.btnAddToScheduler.addEventListener('click', async () => {
+        if (appState.scheduler.length >= 5) return;
+        if (!appState.busFilterOK) await bsAlert(busFilterError);
+        else if (!appState.platformFilterOK) await bsAlert(platformFilterError);
+        else {
+          if (!timeModalInstance) {
+              timeModalInstance = new bootstrap.Modal(document.getElementById('timePromptModal'));
+          }
+          timeModalInstance.show();
+        }
+    });
+
+    document.getElementById('btnConfirmTime').addEventListener('click', () => {
+      const hour = document.getElementById('scheduleHour').value;
+      const minute = document.getElementById('scheduleMinute').value;
+      const timeStr = `${hour}:${minute}`;
+
+      const config = getCurrentLocationConfig();
+      config.time = timeStr;
+
+      // Check if an entry for this exact time already exists
+      const existingIndex = appState.scheduler.findIndex(item => item.time === timeStr);
+
+      if (existingIndex !== -1) {
+        // Replace the existing entry with the new configuration
+        appState.scheduler[existingIndex] = config;
+      } else {
+        // Otherwise, add it as a new entry
+        appState.scheduler.push(config);
+      }
+
+      // Maintain chronological order
+      appState.scheduler.sort((a, b) => a.time.localeCompare(b.time));
+
+      timeModalInstance.hide();
+      renderLists();
+      applyBoardMode();
+    });
+
+    let carouselModalInstance;
+    elements.btnAddToCarousel.addEventListener('click', async () => {
+        if (appState.carousel.length >= 5) return;
+        if (!appState.busFilterOK) await bsAlert(busFilterError);
+        else if (!appState.platformFilterOK) await bsAlert(platformFilterError);
+        else {
+          if (!carouselModalInstance) {
+              carouselModalInstance = new bootstrap.Modal(document.getElementById('carouselDurationModal'));
+          }
+          carouselModalInstance.show();
+        }
+    });
+
+    document.getElementById('btnConfirmCarousel').addEventListener('click', () => {
+        const duration = document.getElementById('carouselDuration').value;
+        const config = getCurrentLocationConfig();
+        config.duration = parseInt(duration); // Save the duration
+
+        appState.carousel.push(config);
+        carouselModalInstance.hide();
+        renderLists();
+        applyBoardMode();
+    });
 
     document.addEventListener("DOMContentLoaded", async () => {
       await fetchRssFeeds();
+      await fetchApiKeys();
       await fetchConfig();
       await fetchFirmware();
-      await fetchApiKeys();
+      await fetchPrevFirmware();
       await fetchAtcoHistory();
       ['/nr.webp', '/tube.webp'].forEach(src => {
         const img = new Image();
         img.src = src;
       });
+      await checkUpgradeNotice();
     });
 
     $("input[name=boardmode]").on("change", function () {
@@ -1151,11 +1324,26 @@
       applyBoardMode();
     });
 
+    // List manipulation functions (Make globally accessible for inline handlers)
+    window.removeListItem = (listName, index) => {
+        appState[listName].splice(index, 1);
+        renderLists();
+        applyBoardMode();
+    };
+
+    window.moveCarouselItem = (index, dir) => {
+        if (index + dir < 0 || index + dir >= appState.carousel.length) return;
+        const item = appState.carousel.splice(index, 1)[0];
+        appState.carousel.splice(index + dir, 0, item);
+        renderLists();
+    };
+
     async function fetchConfig() {
       try {
         const response = await fetch('/config.json');
         if (!response.ok) throw new Error("Failed to fetch config.json from file system.");
         appState.jsonSettings = await response.json();
+        deleteLegacySettings();
         loadSettings();
       } catch (err) {
         await bsAlert(`Error loading config: ${err.message}`,sysErr);
@@ -1177,6 +1365,18 @@
       }
     }
 
+    async function fetchPrevFirmware() {
+      try {
+        const response = await fetch('/fw.json');
+        if (response.ok) {
+          appState.jsonPrevFirmware = await response.json();
+        }
+      } catch (err) {
+        console.error("Prev Firmware fetch error:", err);
+      }
+      appState.prevFirmwareVersion = appState.jsonPrevFirmware.fw ?? "";
+    }
+
     async function fetchApiKeys() {
       try {
         const response = await fetch('/apikeys.json');
@@ -1185,13 +1385,68 @@
           $('#enableWeather').prop('disabled', true).prop('checked', false);
         }
         appState.appKey = data.appKey || "";
+        const select = document.getElementById("dataSource");
         if (!data.nrToken || data.nrToken.length != 36) {
           appState.validNatRailToken = false;
-          if (appState.boardMode == 0) appState.boardMode = 1;
-          applyBoardMode();
+        } else {
+          const option = document.createElement("option");
+          option.value = 0;
+          option.textContent = "Darwin Lite (Legacy)";
+          select.appendChild(option);
+        }
+        if (!data.rdmDepKey || data.rdmDepKey.length < 32) {
+          appState.validRdgRailToken = false;
+        } else {
+          const option = document.createElement("option");
+          option.value = 1;
+          option.textContent = "Rail Delivery Group";
+          select.appendChild(option);
+        }
+        if (!data.rdmSvcKey || data.rdmSvcKey.length < 32) {
+          appState.validRdgServiceToken = false;
         }
       } catch (err) {
         console.warn("Could not load api keys.");
+      }
+    }
+
+    async function checkUpgradeNotice() {
+      if (appState.firmwareVersion == appState.prevFirmwareVersion) return;
+      try {
+        const response = await fetch(githubRepo);
+        if (response.ok) {
+          const data = await response.json();
+          const latestTag = data.tag_name;
+          const latestRelNotes = formatChangelog(data.body);
+          if (appState.firmwareVersion == latestTag) {
+            // Just upgraded to latest version, show release notes
+            await bsAlert(`<b>Release Notes:</b>\n${latestRelNotes}\n\n`,"Firmware Upgraded");
+          }
+          appState.jsonPrevFirmware.fw = appState.firmwareVersion;
+          await saveFwVersionSeen();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function saveFwVersionSeen() {
+      try {
+        const blob = new Blob(
+          [JSON.stringify(appState.jsonPrevFirmware,null,2)],
+          {type:'application/json'}
+        );
+
+        const formData = new FormData();
+        formData.append('file', blob, 'fw.json');
+        const response = await fetch('/upload', {method:'POST',body:formData});
+
+        if (!response.ok) {
+          await bsAlert("Failed to save notes as read to board.",sysErr);
+          return;
+        }
+      } catch (err) {
+        await bsAlert("Failed to upload firmware data to board: " + err.message,sysErr);
       }
     }
 
@@ -1234,10 +1489,10 @@
         appState.busIdOK = true;
         elements.busLongName.innerHTML = "Location: <b>" + appState.busName + "</b>";
         saveRecentBusAtco(userAtco, appState.busName, appState.busLat, appState.busLon);
-        elements.saveButton.disabled = false;
+        enableSave(true);
         toggleBusFilterBox();
       } else {
-        elements.saveButton.disabled = true;
+        enableSave(false);
         elements.busLongName.innerHTML = "";
         appState.busIdOK = false;
         toggleBusFilterBox();
@@ -1250,12 +1505,6 @@
       show("sleepTimeSelectors", enabled);
     }
 
-    function toggleAltSelectors() {
-      const enabled = appState.altCrs;
-      show("altStationTimeSelectors", enabled);
-      show("nrAltCallingBox", enabled);
-    }
-
     function toggleBusFilterBox() {
       show("busFilterBox", appState.busIdOK);
     }
@@ -1263,29 +1512,33 @@
     function applyBoardMode() {
       const mode = appState.boardMode;
 
-      const rail = (mode === 0 && appState.validNatRailToken);
+      const rail = (mode === 0 && (appState.validNatRailToken || appState.validRdgRailToken));
       const tube = (mode === 1);
       const bus = (mode === 2);
 
       show("nrT", rail);
       show("nrSearchBox", rail);
       show("nrCallingBox", rail);
-      show("nrAtt", rail);
-      show("nrAltStation", rail);
+      show("nrAtt", rail && appState.dataSource == 0);
+      show("rdgAtt", rail && appState.dataSource == 1);
       show("optBuses", rail);
+      show("optShowServiceMsgs", rail || tube);
       show("optShowPlatform", rail);
       show("optShowOrdinals",rail);
-      show("optShowLastSeen", rail);
+      show("optShowLastSeen", rail && (appState.dataSource == 0 || appState.validRdgServiceToken));
+      show("optShowFullCalling",rail);
       show("optShowFullMsgs", rail);
       show("optFastRefresh", rail);
       show("optNoScroll", rail || tube);
       show("optRssFeed", rail || tube);
+      show("optDataSource", rail);
       show("optNrTimeOffset", rail);
-      show("nrInvalidToken", mode === 0 && !appState.validNatRailToken);
+      show("nrInvalidToken", mode === 0 && !appState.validNatRailToken && !appState.validRdgRailToken);
 
       show("tflT", tube);
       show("tflSearchBox", tube);
       show("tflAtt", tube);
+      show("optShowTubeLocation", tube);
 
       show("busT", bus);
       show("busAtcoBox", bus);
@@ -1304,10 +1557,12 @@
         (tube && appState.tubeName) ||
         (bus && appState.busIdOK)
       ) {
-        elements.saveButton.disabled = false;
+        enableSave(true);
       } else {
-        elements.saveButton.disabled = true;
+        enableSave(false);
       }
+      //elements.btnAddToScheduler.disabled = appState.scheduler.length >= 5;
+      //elements.btnAddToCarousel.disabled = appState.carousel.length >= 5;
       highlightModeButtons(mode);
     }
 
@@ -1327,11 +1582,117 @@
 
     elements.busAtco.addEventListener('input', function () {
       validateAtcoFormat();
-      elements.saveButton.disabled = true;
+      enableSave(false);
       elements.busLongName.innerHTML = "";
       appState.busIdOK = false;
       toggleBusFilterBox();
     });
+
+    function getCurrentLocationConfig() {
+        let config = {
+            mode: appState.boardMode,
+            name: "", filter: ""
+        };
+
+        if (appState.boardMode === 0) { // Rail
+            config.name = appState.stationName;
+            config.crs = appState.stationCRS;
+            config.lat = appState.stationLatitude;
+            config.lon = appState.stationLongitude;
+            config.callingStation = appState.callingStation;
+            config.callingCrs = appState.callingCrs;
+            config.platformFilter = appState.platformFilter;
+            config.filter = [appState.callingStation ? `Calling at: ${appState.callingStation}` : "",
+                              appState.platformFilter ? `Platform: ${appState.platformFilter}` : ""].filter(Boolean).join(", ");
+        } else if (appState.boardMode === 1) { // Tube
+            config.name = appState.tubeName;
+            config.name = config.name.replace(/ (Underground Station|DLR Station|\(H&C Line\))$/i, "");
+            config.tubeId = appState.tubeId;
+            config.lineid = appState.tubeLineId;
+            config.direction = appState.tubeDirection;
+            config.lat = appState.tubeLat;
+            config.lon = appState.tubeLon;
+            config.filter = [appState.tubeLineId !== "all" ? `Line: ${appState.tubeLineId}` : "",
+                              appState.tubeDirection ? `Dir: ${appState.tubeDirection}` : ""].filter(Boolean).join(", ");
+        } else { // Bus
+            config.name = appState.busName;
+            config.busId = appState.busId;
+            config.lat = appState.busLat;
+            config.lon = appState.busLon;
+            config.busFilter = appState.busFilter;
+            config.filter = appState.busFilter ? `Services: ${appState.busFilter}` : "";
+        }
+        return config;
+    }
+
+    function renderLists() {
+
+        appState.scheduler.sort((a, b) => a.time.localeCompare(b.time));
+
+        const getIcon = (mode) => {
+            if (mode === 0) return '<img src="/irail.webp" style="height:13px; margin-right:6px; vertical-align:middle;">';
+            if (mode === 1) return '<img src="/itube.webp" style="height:13px; margin-right:6px; vertical-align:middle;">';
+            if (mode === 2) return '<img src="/ibus.webp" style="height:13px; margin-right:6px; vertical-align:middle;">';
+            return '';
+        };
+
+        if (appState.scheduler.length === 0) {
+          elements.schedulerListContainer.innerHTML = '<div class="text-muted fst-italic px-3 py-2">No items added to the scheduler.</div>';
+          elements.enableScheduler.checked = false;
+          elements.enableScheduler.disabled = true;
+        } else {
+          elements.enableScheduler.disabled = false;
+          elements.schedulerListContainer.innerHTML = '';
+          appState.scheduler.forEach((item, index) => {
+              const div = document.createElement('div');
+              div.className = 'list-group-item d-flex align-items-start';
+              div.innerHTML = `
+                  <div class="flex-shrink-0">${getIcon(item.mode)}</div>
+                    <div class="flex-grow-1 pe-2"><span class="me-1"><strong>${item.name}</strong></span>
+                        <span class="badge bg-secondary">${item.time}</span>
+                        <div class="small text-muted">${item.filter || "No filters"}</div>
+                    </div>
+                    <div class="flex-shrink-0">
+                      <button class="btn btn-sm btn-danger" onclick="removeListItem('scheduler', ${index})"><i class="bi bi-trash"></i></button>
+                    </div>
+                  </div>
+              `;
+              elements.schedulerListContainer.appendChild(div);
+          });
+        }
+
+        if (appState.carousel.length === 0) {
+          elements.carouselListContainer.innerHTML = '<div class="text-muted fst-italic px-3 py-2">No items added to the carousel.</div>';
+          elements.enableCarousel.checked = false;
+          elements.enableCarousel.disabled = true;
+        } else {
+          elements.enableCarousel.disabled = false;
+          elements.carouselListContainer.innerHTML = '';
+          appState.carousel.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'list-group-item d-flex align-items-start';
+            div.innerHTML = `
+                <div class="flex-shrink-0">${getIcon(item.mode)}</div>
+                  <div class="flex-grow-1 pe-2"><span class="me-1"><strong>${item.name}</strong></span>
+                      <span class="badge bg-primary">${item.duration} ${item.duration == 1 ? 'min' : 'mins'}</span>
+                      <div class="small text-muted">${item.filter || "No filters"}</div>
+                  </div>
+                  <div class="flex-shrink-0 btn-group btn-group-sm ms-2">
+                    <button class="btn btn-outline-secondary" onclick="moveCarouselItem(${index}, -1)" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up"></i></button>
+                    <button class="btn btn-outline-secondary" onclick="moveCarouselItem(${index}, 1)" ${index === appState.carousel.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down"></i></button>
+                    <button class="btn btn-danger" onclick="removeListItem('carousel', ${index})"><i class="bi bi-trash"></i></button>
+                  </div>
+                </div>
+            `;
+            elements.carouselListContainer.appendChild(div);
+        });
+      }
+    }
+
+    function deleteLegacySettings() {
+      const keysToRemove=["altCrs","altStation","altLat","altLon","altStarts","altEnds","altCallingStation","altCallingCrs","altPlatformFilter"];
+      for (const key of keysToRemove) {delete appState.jsonSettings[key];}
+    }
 
     function loadSettings() {
       const s = appState.jsonSettings;
@@ -1343,9 +1704,6 @@
       appState.callingStation = s.callingStation || "";
       appState.callingCrs = s.callingCrs || "";
       appState.platformFilter = s.platformFilter || "";
-      appState.altCallingStation = s.altCallingStation || "";
-      appState.altCallingCrs = s.altCallingCrs || "";
-      appState.altPlatformFilter = s.altPlatformFilter || "";
 
       appState.tubeName = s.tubeName || "";
       appState.tubeId = s.tubeId || "";
@@ -1362,14 +1720,15 @@
       appState.busFilter = s.busFilter || "";
       appState.boardMode = s.mode ?? (s.tube != undefined ? (s.tube ? 1 : 0) : 0);
       delete s.tube;
+      elements.dataSource.value = s.dataSource ?? (appState.validRdgRailToken ? 1 : 0);
+      if (elements.dataSource.value != "") appState.dataSource = parseInt(elements.dataSource.value);
+      if (!appState.validNatRailToken && !appState.validRdgRailToken && appState.boardMode == 0) {
+        appState.boardMode = 1;
+      }
       highlightModeButtons(appState.boardMode);
-      applyBoardMode();
       elements.searchName.value = appState.stationName;
       elements.callingStation.value = appState.callingStation;
       elements.platformFilter.value = appState.platformFilter;
-      elements.altCallingStation.value = appState.altCallingStation;
-      elements.altPlatformFilter.value = appState.altPlatformFilter;
-      show("nrAltCallingBox", appState.altCallingCrs.length);
       elements.searchNameTfL.value = appState.tubeName;
       if (appState.tubeId) {
         fetchTubeLines(appState.tubeId, appState.tubeLineId);
@@ -1380,14 +1739,6 @@
       elements.brightness.value = s.brightness ?? 50;
       const pct = (elements.brightness.value / 255) * 100;
       elements.brightness.title = Math.round(pct) + "%";
-
-      appState.altStation = s.altStation || "";
-      appState.altCrs = s.altCrs || "";
-      appState.altLatitude = s.altLat ?? 0;
-      appState.altLongitude = s.altLon ?? 0;
-      appState.altStarts = s.altStarts ?? 12;
-      appState.altEnds = s.altEnds ?? 23;
-      elements.altStation.value = appState.altStation;
 
       if (appState.busName.length) elements.busLongName.innerHTML = "Location: <b>" + appState.busName + "</b>";
       toggleBusFilterBox();
@@ -1409,6 +1760,9 @@
       setCheckbox("showPlatform", !(s.hidePlatform ?? false));
       setCheckbox("showOrdinals", !(s.hideOrdinals ?? false));
       setCheckbox("showLastSeen", s.showLastSeen);
+      setCheckbox("showServiceMsgs", s.showServiceMsgs ?? true);
+      setCheckbox("showTubeLocation", s.showTubeLocation ?? false);
+      setCheckbox("showFullCalling", (s.showFullCalling ?? true));
       setCheckbox("showFullMsgs", (s.showFullMsgs ?? true));
       setCheckbox("enableFastRefresh", s.fastRefresh);
       setCheckbox("noScrolling", s.noScroll);
@@ -1420,17 +1774,19 @@
 
       elements.sleepStart.value = s.sleepStarts;
       elements.sleepEnd.value = s.sleepEnds;
-      elements.altStart.value = appState.altStarts;
-      elements.altEnd.value = appState.altEnds;
       elements.nrTimeOffset.value = s.nrTimeOffset ?? 0;
       elements.forceWakeTime.value = s.forceWakeTime ?? 300;
       const rssUrl = s.rssUrl || "";
       const rssSelect = document.getElementById('rssFeedList');
       const optionExists = rssSelect.querySelector(`option[value="${rssUrl}"]`);
       rssSelect.value = optionExists ? rssUrl : "";
-
       toggleSleepSelectors();
-      toggleAltSelectors();
+      document.getElementById('enableScheduler').checked = s.enableScheduler || false;
+      document.getElementById('enableCarousel').checked = s.enableCarousel || false;
+      appState.scheduler = s.scheduler || [];
+      appState.carousel = s.carousel || [];
+      renderLists();
+      applyBoardMode();
     }
 
     function setCheckbox(id, value) {
@@ -1445,9 +1801,9 @@
       appState.stationLongitude = item.longitude;
 
       if (item.classification === "LONDON_UNDERGROUND") {
-        elements.saveButton.disabled = true;
+        enableSave(false);
       } else {
-        elements.saveButton.disabled = false;
+        enableSave(true);
       }
     }
 
@@ -1455,21 +1811,6 @@
       appState.callingStationSelected = true;
       appState.callingStation = item.name;
       appState.callingCrs = item.crsCode;
-    }
-
-    function handleAltCallingStationSelected(item) {
-      appState.altCallingStationSelected = true;
-      appState.altCallingStation = item.name;
-      appState.altCallingCrs = item.crsCode;
-    }
-
-    function handleAltStationSelected(item) {
-      appState.altStationSelected = true;
-      appState.altStation = item.name;
-      appState.altCrs = item.crsCode;
-      appState.altLatitude = item.latitude;
-      appState.altLongitude = item.longitude;
-      toggleAltSelectors();
     }
 
     async function fetchTubeLines(stopPointId, selectedLineId = "all") {
@@ -1532,7 +1873,7 @@
       appState.tubeLineId = "all";
       appState.tubeDirection = "";
       elements.tubeDirectionFilter.value = "";
-      elements.saveButton.disabled = false;
+      enableSave(true);
       fetchTubeLines(item.id, "all");
     }
 
@@ -1552,22 +1893,6 @@
       }
     }
 
-    function handleAltCallingStationLostFocus() {
-      if (!appState.altCallingStationSelected) {
-        elements.altCallingStation.value = appState.altCallingStation;
-      } else {
-        appState.altCallingStationSelected = false;
-      }
-    }
-
-    function handleAltStationLostFocus() {
-      if (!appState.altStationSelected) {
-        elements.altStation.value = appState.altStation;
-      } else {
-        appState.altStationSelected = false;
-      }
-    }
-
     function handleTfLStationLostFocus() {
       if (!appState.stationSelectedTfL) {
         elements.searchNameTfL.value = appState.tubeName;
@@ -1581,24 +1906,6 @@
       appState.callingStation = "";
       appState.callingStationSelected = false;
       elements.callingStation.value = appState.callingStation;
-    }
-
-    function handleAltClearFilter() {
-      appState.altCallingCrs = "";
-      appState.altCallingStation = "";
-      appState.altCallingStationSelected = false;
-      elements.altCallingStation.value = appState.altCallingStation;
-    }
-
-    function handleClearAltStation() {
-      appState.altCrs = "";
-      appState.altStation = "";
-      appState.altStationSelected = false;
-      appState.altLatitude = 0;
-      appState.altLongitude = 0;
-      elements.altStation.value = appState.altStation;
-      handleAltClearFilter();
-      toggleAltSelectors();
     }
 
     function handleBrightnessChange() {
@@ -1631,12 +1938,15 @@
       s.darkSleep = isChecked("darkSleep");
       s.showDate = isChecked("showDate");
       s.showBus = isChecked("enableBuses");
+      s.showServiceMsgs = isChecked("showServiceMsgs");
+      s.showTubeLocation = isChecked("showTubeLocation");
       s.update = isChecked("enableFirmware");
       s.updateDaily = isChecked("enableFirmwareDaily");
       s.weather = isChecked("enableWeather");
       s.hidePlatform = !isChecked("showPlatform");
       s.hideOrdinals = !isChecked("showOrdinals");
       s.showLastSeen = isChecked("showLastSeen");
+      s.showFullCalling = isChecked("showFullCalling");
       s.showFullMsgs = isChecked("showFullMsgs");
       s.fastRefresh = isChecked("enableFastRefresh");
       s.noScroll = isChecked("noScrolling");
@@ -1645,19 +1955,11 @@
       s.dataIcon = isChecked("optCommsIcon");
       s.sleepStarts = parseInt(elements.sleepStart.value);
       s.sleepEnds = parseInt(elements.sleepEnd.value);
-      s.altCrs = appState.altCrs;
-      s.altStation = appState.altStation;
-      s.altLat = appState.altLatitude;
-      s.altLon = appState.altLongitude;
-      s.altStarts = parseInt(elements.altStart.value);
-      s.altEnds = parseInt(elements.altEnd.value);
-      s.altCallingStation = appState.altCallingStation;
-      s.altCallingCrs = appState.altCallingCrs;
-      s.altPlatformFilter = appState.altPlatformFilter;
       s.nrTimeOffset = parseInt(elements.nrTimeOffset.value);
       s.forceWakeTime = parseInt(elements.forceWakeTime.value);
       s.rssUrl = elements.rssFeedList.value;
       s.rssPriority = isChecked("rssPriority");
+      if (elements.dataSource.value != "") s.dataSource = parseInt(elements.dataSource.value);
       var selectedText = document.querySelector("#rssFeedList option:checked").textContent;
       s.rssName = selectedText;
       if (appState.busIdOK) {
@@ -1669,6 +1971,10 @@
       }
       if (isChecked("optTZ") && elements.customTZ.value.trim().length) s.TZ = elements.customTZ.value.trim(); else delete s.TZ;
       if (isChecked("optHost") && elements.customHost.value.trim().length) s.hostname = elements.customHost.value.trim(); else delete s.hostname;
+      s.enableScheduler = document.getElementById('enableScheduler').checked;
+      s.enableCarousel = document.getElementById('enableCarousel').checked;
+      s.scheduler = appState.scheduler;
+      s.carousel = appState.carousel;
       try {
         const response = await fetch(`/savesettings${needRestart ? '?reboot=1' : ''}`, {
           method: 'POST',
@@ -1701,7 +2007,7 @@
 
     async function handleCheckUpdates() {
       try {
-        const response = await fetch("https://api.github.com/repos/gadec-uk/departures-board/releases/latest");
+        const response = await fetch(githubRepo);
         if (!response.ok) throw new Error("Failed to fetch the latest release information from GitHub.");
 
         const data = await response.json();

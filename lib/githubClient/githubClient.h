@@ -9,47 +9,38 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  */
 #pragma once
-#include <JsonListener.h>
-#include <JsonStreamingParser.h>
+#include <JsonListenerGS.h>
+#include <JsonStreamingParserGS.h>
 #include <md5Utils.h>
+#include <sharedDataStructs.h>
+#include <responseCodes.h>
 
 #define MAX_RELEASE_ASSETS 16   //  The maximum number of release asset details that will be read and stored
-
-class github: public JsonListener {
+#define RELEASEIDSIZE
+class github: public JsonListenerGS {
 
     private:
-        const char* apiHost = "api.github.com";
-        String apiGetLatestRelease = "/repos/gadec-uk/departures-board/releases/latest";
-        String currentKey = "";
-        String currentArray = "";
-        String currentObject = "";
-        String previousObject = "";
 
-        String lastErrorMsg = "";
-
+        sharedBufferSpace* js = nullptr;
         String assetURL;
         String assetName;
         md5Utils md5;
 
     public:
-        String accessToken;
-        String releaseId;
-        String releaseDescription;
-        int releaseAssets;
-        String releaseAssetURL[MAX_RELEASE_ASSETS];
-        String releaseAssetName[MAX_RELEASE_ASSETS];
+        String releaseId="";
+        String releaseDescription="";
+        String firmwareURL="";
 
-        github(String repository, String token);
+        github(sharedBufferSpace *sharedBuffer);
 
-        bool getLatestRelease();
-        //bool downloadAssetToLittleFS(String url, String filename);
+        int getLatestRelease();
 
         String getLastError();
 
         virtual void whitespace(char c);
         virtual void startDocument();
-        virtual void key(String key);
-        virtual void value(String value);
+        virtual void key(const char *key);
+        virtual void value(const char *value);
         virtual void endArray();
         virtual void endObject();
         virtual void endDocument();

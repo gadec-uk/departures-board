@@ -6,15 +6,16 @@ A model railway (00 gauge) version of this project is also available [here](http
 
 ## Features
 * All processing is done onboard by the ESP32 processor, no middleware servers
-* **NEW** Support for touch sensor to switch modes / stations / wake from screensaver
+* Support for touch sensor to switch modes / stations / wake from screensaver
 * Smooth animation matching the real departures and arrivals boards
 * Displays up to the next 9 departures with scheduled time, platform number, destination, calling stations and expected departure time
 * Optionally display the last reported location of a service
 * Optionally only show services calling at a selected railway station
-* Optionally display an alternate railway station between specific hours of the day
+* Scheduler and Carousel modes to automatically switch between any combination of railway, tube and bus stops
 * Displays Network Rail service messages
 * Train information (operator, class, number of coaches etc.)
 * Displays up to the next 9 arrivals with time to station (London Underground mode)
+* Optionally display the current location of the train (London Underground mode)
 * TfL station and network service messages (London Underground mode)
 * Optionally filter by tube line and direction
 * In Bus mode, displays up to the next 9 departures with service number, destination, vehicle registration and schedule/expected time
@@ -35,9 +36,11 @@ A model railway (00 gauge) version of this project is also available [here](http
 2. A 3.12" 256x64 OLED Display Panel with SSD1322 display controller onboard. For example, from [AliExpress](https://www.aliexpress.com/item/1005008558326731.html).
 3. A 3D printed case using the [STL](https://github.com/gadec-uk/departures-board/tree/main/stl) files provided. If you don't have a 3D printer, you can use a 3D print service, local library or group.
 4. Optionally, a TTP223 touch sensor (for easily switching modes / stations). For example, from [AliExpress](https://www.aliexpress.com/item/1005007850732859.html). If fitted, the touch sensor should be glued to the inside of one of the walls of the top part of the case with the *sensor* side against the case.
-5. A National Rail Darwin Lite API token (these are free of charge - request one [here](https://realtime.nationalrail.co.uk/OpenLDBWSRegistration)).
+5. For National Rail, the board supports using either the Rail Delivery Group feeds (recommended) or the legacy OpenLDBWS feed. Both feeds are free of charge and provide identical information but the legacy OpenLDBWS feed may be discontinued in the future. To use the Rail Delivery Group feeds, you will need a [Live Departure Board 1.1](https://raildata.org.uk/dataProduct/P-d81d6eaf-8060-4467-a339-1c833e50cbbe/overview) consumer key and (optionally) a [Service Details 1.1](https://raildata.org.uk/dataProduct/P-4dec1247-d040-4290-80a4-639dfac54a92/overview) consumer key. Alternatively, if you prefer to use the legacy OpenLDBWS feed, you can register for a token [here](https://realtime.nationalrail.co.uk/OpenLDBWSRegistration).
 6. Optionally, an OpenWeather Map API token to display weather conditions at the selected station (these are also free, sign-up for a free developer account [here](https://home.openweathermap.org/users/sign_up)).
 7. Some intermediate soldering skills.
+
+A step-by-step guide to obtaining the API keys is available [here](https://departures-board.github.io/Departures-Board-API-Keys-Guide.pdf).
 
 <img src="https://github.com/user-attachments/assets/5ae96896-62cc-4880-a3a8-79ac505e7605" align="center">
 
@@ -69,7 +72,7 @@ Solder the 4 SPI connections, plus power and ground. The wires **MUST** be solde
 
 ### Installing the firmware
 
-The project uses the Arduino framework and the ESP32 v3.2.0 core. If you want to build from source, you'll need [PlatformIO](https://platformio.org).
+The project uses the Arduino framework and the ESP32 v3.2.0 core. If you want to build from source, you'll need [PlatformIO](https://platformio.org). The software is designed for, and makes use of, a dual-core ESP32 processor. If you attempt to target and compile for a single core ESP32 variant the experience will be suboptimal at best.
 
 The easiest way to install the firmware for the first time is to use the online web based installer [here](https://departures-board.github.io). You will need to use Chrome or Edge as your browser as Safari/Firefox do not support Web Serial.
 
@@ -110,39 +113,45 @@ At start-up, the ESP32's IP address is displayed. To change the station or to co
 - **Station** - start typing a few characters of a station name and select from the drop-down station picker displayed (National Rail mode).
 - **Only show services calling at** - filter services based on *calling at* location (National Rail mode - if you want to see the next trains *to* a particular station).
 - **Only show these platforms** - filter services based on the platform they depart from. Note: there are many services for which platform number is not supplied, these would also be filtered out.
-- **Alternate station** - automatically switch to displaying an alternate station between the hours set here (National Rail mode).
-- **Only show services calling at (alternate active)** - as above, but applies when the alternate station is active.
-- **Only show these platforms (alternate active)** - as above, but applies when the alternate station is active.
+- **Add to Scheduler** - adds the current configured station/tube/bus stop to the scheduler (see schedule tab) to switch based on time of day.
+- **Add to Carousel** - adds the current configured station/tube/bus stop to the carousel (see schedule tab) to switch views after a period of time. 
 - **Underground Station** - start typing a few characters of an Underground or DLR station name and select from the drop-down station picker displayed (London Underground mode).
 - **Filter by Line** - Select the desired underground line or all lines for all arrivals.
 - **Filter by Direction** - Select the desired direction or any direction for all arrivals.
 - **Bus Stop ATCO code** - Type the ATCO number of the bus stop you want to monitor (see [below](#bus-stop-atco-codes) for details).
 - **Only show these Bus services** - filter buses by service numbers (enter a list of the service numbers, comma separated).
 - **Recently verfied ATCO codes** - quickly select from recently used bus stop ATCO codes.
+#### Options tab ####
 - **Brightness** - adjusts the brightness of the OLED screen.
 - **Show the date on screen** - displays the date in the upper-right corner (useful if you're also using this as a desk clock).
 - **Include current weather at station location** - this option requires a valid OpenWeather Map API key.
 - **Include bus replacement services** - optionally include bus replacement services (National Rail mode).
+- **Show station messages** - displays station and service messages (Rail and Tube modes).
+- **Show service location** - displays the current location of the next tube train that is due to arrive (Tube mode).
 - **Show platform numbers if available** - deselecting this option will hide platform numbers (National Rail).
 - **Show service ordinal numbers** - Displays "2nd","3rd","4th" etc. next to the service times (National Rail).
 - **Show service last seen location** - Adds the last reported location and time of a service to the Calling at list (National Rail).
-- **Wait for Calling at list to complete** - Waits for the Calling at list or current message/RSS feed to finish scrolling before changing the primary service.
+- **Wait for Calling at list to complete** - Waits for the Calling at list to finish scrolling before changing the primary service.
+- **Wait for Messages or RSS to complete** - Waits for the current service message or RSS headline feed to finish scrolling before changing the primary service.
 - **Enable automatic firmware updates at startup** - automatically checks for AND installs the latest firmware from this repository when the system starts up.
 - **Enable daily check for firmware updates** - when enabled, the system will check for and install any updates just after midnight if the board is powered on.
 - **Enable overnight sleep mode (screensaver)** - if you're running the board 24/7, you can help prevent screen burn-in by enabling this option overnight.
 - **Switch off display during sleep mode** - turns off the display completely during sleep mode, otherwise displays the date & time.
-- ***Enable touch sensor** - A short tap switches between configured modes (rail/tube/bus). A long tap switches between primary and alternate railway stations (if configured). Obviously, do not enable this option if you have not installed a TTP223 touch sensor.
-- ***Wake from sleep by touch for** - if the board is in screensaver mode and the touch sensor is enabled, a tap will wake the board and it will remain awake for the selected number of minutes (the countdown timer resets on each tap).
-- ***Flip the display 180°** - Rotates the display (the case design provides two different viewing angles depending on orientation).
-- ***Set custom hostname for this board** - change the hostname from the default "DeparturesBoard", useful if you are running multiple boards.
-- ***Custom (non-UK) time zone (only for clock)** - if you're not based in the UK you can set the clock to display in your local time zone (see [below](#custom-time-zones) for details).
-- ***Suppress calling at / information messages** - removes all horizontally scrolling text (much lower functionality but less distracting).
-- ***Increase API refresh rate** - Reduces the interval between data refreshes (National Rail mode).
-- ***Display RSS news headlines feed** - Displays the top headlines from the selected feed (Rail/Tube mode).
-- ***Prioritise RSS headlines feed** - Displays headlines before other network service messages.
-- ***Display departures offset by** - Displays future (or past) services offset by the selected time. This does not affect the clock display (Rail mode).
-
-Items marked * are on the *Advanced Options* tab.
+#### Schedule tab ####
+- **Enable scheduler** - Automatically switches between views based on the configured time of each entry in the scheduler list below.
+- **Enable carousel** - Automatically switches between views based on the configured view time of each entry in the carousel list below. 
+#### Advanced Tab ####
+- **Enable touch sensor** - A tap switches between configured modes (rail/tube/bus) or wakes from sleep. If the Scheduler or Carousel mode is active, a tap switch to the next location in the list. Obviously, do not enable this option if you have not installed a TTP223 touch sensor.
+- **Wake from sleep by touch for** - if the board is in screensaver mode and the touch sensor is enabled, a tap will wake the board and it will remain awake for the selected number of minutes (the countdown timer resets on each tap).
+- **Flip the display 180°** - Rotates the display (the case design provides two different viewing angles depending on orientation).
+- **Set custom hostname for this board** - change the hostname from the default "DeparturesBoard", useful if you are running multiple boards.
+- **Custom (non-UK) time zone (only for clock)** - if you're not based in the UK you can set the clock to display in your local time zone (see [below](#custom-time-zones) for details).
+- **Suppress calling at / information messages** - removes all horizontally scrolling text (much lower functionality but less distracting).
+- **Increase API refresh rate** - Reduces the interval between data refreshes (National Rail mode).
+- **Display RSS news headlines feed** - Displays the top headlines from the selected feed (Rail/Tube mode).
+- **Prioritise RSS headlines feed** - Displays headlines before other network service messages.
+- **Display departures offset by** - Displays future (or past) services offset by the selected time. This does not affect the clock display (Rail mode).
+- **Rail data source** - Select which api feed should be used for National Rail mode (only feeds with api keys present are shown).
 
 A drop-down menu (top-right) adds the following options:
 - **Check for Updates** - manually checks for and optionally installs any updates to the firmware. Also displays the release notes of the latest firmware.

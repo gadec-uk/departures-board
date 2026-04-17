@@ -9,34 +9,31 @@
  * To view a copy of this license, visit https://creativecommons.org/licenses/by-nc-sa/4.0/
  */
 #pragma once
-#include <JsonListener.h>
-#include <JsonStreamingParser.h>
+#include <JsonListenerGS.h>
+#include <JsonStreamingParserGS.h>
+#include <sharedDataStructs.h>
 #include <responseCodes.h>
 
-class weatherClient: public JsonListener {
+class weatherClient: public JsonListenerGS {
 
     private:
         const char* apiHost = "api.openweathermap.org";
-        String currentKey = "";
-        String currentObject = "";
+        sharedBufferSpace* js = nullptr;
         int weatherItem = 0;
 
-        String description;
         float temperature;
         float windSpeed;
 
     public:
-        String currentWeather = "";
-        String lastErrorMsg = "";
+        char currentWeatherMessage[MAXWEATHERSIZE];
 
-        weatherClient();
-
+        weatherClient(sharedBufferSpace *sharedBuffer);
         int updateWeather(String apiKey, String lat, String lon);
 
         virtual void whitespace(char c);
         virtual void startDocument();
-        virtual void key(String key);
-        virtual void value(String value);
+        virtual void key(const char *key);
+        virtual void value(const char *value);
         virtual void endArray();
         virtual void endObject();
         virtual void endDocument();

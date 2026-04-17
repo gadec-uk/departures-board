@@ -25,10 +25,6 @@
  *
  */
 
-// Release version number
-#define VERSION_MAJOR 2
-#define VERSION_MINOR 4
-
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -44,9 +40,10 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <weatherClient.h>
-#include <stationData.h>
+#include <sharedDataStructs.h>
 #include <responseCodes.h>
 #include <raildataXmlClient.h>
+#include <rdmRailClient.h>
 #include <TfLdataClient.h>
 #include <busDataClient.h>
 #include <githubClient.h>
@@ -56,7 +53,7 @@
 #include <webgui/index.h>
 #include <webgui/keys.h>
 #include <webgui/editrss.h>
-#include <webgui/rssfeeds.h>
+#include <webgui/rss.h>
 #include <gfx/xbmgfx.h>
 #include <time.h>
 
@@ -70,9 +67,9 @@
 static AsyncWebServer server(80); // Hosting the Web GUI
 
 // Shorthand for response formats
-static const char contentTypeJson[] PROGMEM = "application/json";
-static const char contentTypeText[] PROGMEM = "text/plain";
-static const char contentTypeHtml[] PROGMEM = "text/html";
+static const char contentTypeJson[] = "application/json";
+static const char contentTypeText[] = "text/plain";
+static const char contentTypeHtml[] = "text/html";
 
 // Using NTP to set and maintain the clock
 static struct tm timeinfo;
@@ -82,7 +79,7 @@ static const char ukTimezone[] = "GMT0BST,M3.5.0/1,M10.5.0";
 static const char defaultHostname[] = "DeparturesBoard";
 
 // Local firmware updates via /update Web GUI
-static const char updatePage[] PROGMEM =
+static const char updatePage[] =
 "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
 "<html><body style=\"font-family:Helvetica,Arial,sans-serif\"><h2>Departures Board Manual Update</h2><p>Upload a <b>firmware.bin</b> file.</p>"
 "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
@@ -121,13 +118,13 @@ static const char updatePage[] PROGMEM =
  "</script></body></html>";
 
 // /upload page
-static const char uploadPage[] PROGMEM =
+static const char uploadPage[] =
 "<html><body style=\"font-family:Helvetica,Arial,sans-serif\">"
 "<h2>Upload a file to the file system</h2><form method='post' enctype='multipart/form-data'><input type='file' name='name'>"
 "<input class='button' type='submit' value='Upload'></form></body></html>";
 
 // /success page
-static const char successPage[] PROGMEM =
+static const char successPage[] =
 "<html><body style=\"font-family:Helvetica,Arial,sans-serif\"><h3>Upload completed successfully.</h3>\n"
 "<p><a href=\"/dir\">List file system directory</a></p>\n"
 "<h2>Upload another file</h2><form method=\"post\" action=\"/upload\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"name\"><input class=\"button\" type=\"submit\" value=\"Upload\"></form>\n"
@@ -158,51 +155,52 @@ static Ticker restartTimer; // used to schedule reboots
 //
 // Custom fonts - replicas of those used on the real display boards
 //
-static const uint8_t NatRailSmall9[1297] U8G2_FONT_SECTION("NatRailSmall9") =
-  "\221\0\3\2\3\4\4\5\5\11\11\0\0\11\0\11\2\1@\2\206\4\370 \5\0\314\24!\7\71\224"
-  "\22\203\22\42\7\33\264\24\211%#\16=\224\66\245$\31\224\312\240\224\222\4$\14=\224V\331R\333"
-  "\222d\213\0%\14<\224\25\221\42ER\244H\1&\15=\224\66RIJ\22)\211\42%'\6\31"
-  "\264\22\3(\10;\224TI\251V)\11;\224\24Y\251R\2*\12-\234\26Ie\261,\15+\12"
-  "-\234Va\64Ha\4,\7\32\204\63\211\2-\6\13\254\24\3.\6\11\224\22\1/\13<\224u"
-  "\221\24I\221\224\1\60\12=\224\66K\346-Y\0\61\10\273\224\66\211\324e\62\13=\224\66K\26f"
-  "m\203\0\63\14=\224\66K\26F\252\226,\0\64\15=\224v\231\224\224\222A\13\23\0\65\13=\224"
-  "\26\307!\15\265d\1\66\15=\224\66K&\16I\246%\13\0\67\12=\224\26\203\230\25\233\0\70\15"
-  "=\224\66K\246%K\246%\13\0\71\15=\224\66K\246%C\250%\13\0:\7!\234\22Q\0;"
-  "\7*\224\63\251\2<\10<\224uQc\3=\10\34\244\25C\70\4>\11<\224\25aS\33\0?"
-  "\14=\224\66K\26FZ\16E\0@\14=\224\66KfI\224!]\0A\13=\224\66K\246\15C"
-  "f\13B\15=\224\26C\222i\203\222i\203\2C\13=\224\66K&\266%\13\0D\13=\224\26C"
-  "\222y\33\24\0E\13=\224\26\307pH\302p\20F\13=\224\26\307pH\302\42\0G\15=\224\66"
-  "K&&C\246%\13\0H\13=\224\26\231m\30\62[\0I\7\71\224\22\207\0J\11=\224\226\35"
-  "\265d\1K\15=\224\26\231\224\224\264$\252d\1L\11=\224\26a\217\203\0M\13=\224\26\331\262"
-  "$\232[\0N\13=\224\26\331\244$\322f\13O\12=\224\66K\346-Y\0P\14=\224\26C\222"
-  "i\203\22\26\1Q\13M\204\66K\346-\31\323\0R\15=\224\26C\222i\203R\252d\1S\13="
-  "\224\66K\246\256Z\262\0T\11=\224\26\203\24\366\4U\11=\224\26\231o\311\2V\12=\224\26\231"
-  "\267\244\26\1W\13=\224\26\231K\242$\267\0X\13=\224\26\231\226\324*\65-Y\13=\224\26\231"
-  "\226\324\302&\0Z\12=\224\26\203\230u\34\4[\10:\224\23K\27\1\134\12<\224\25\231\226i\231"
-  "\26]\10:\224\31J\227\1^\6\23\274\64\15_\7\14\214\25C\0`\7\22\274\23Q\0a\12-"
-  "\224\66k\62h\311\20b\13=\224\26a\305\244i\203\2c\11-\224\66\203X\35\2d\13=\224\226"
-  "\25\323\246%C\0e\12-\224\66K\66\14\351\20f\12<\224U\225\322\224\225\0g\14=\204\66\203"
-  "fK\206pP\0h\12=\224\26a\305\244\331\2i\7\71\224\22\311 j\13L\204u\71\220\265I"
-  "\211\2k\13<\224\25YII\244\244\24l\7\71\224\22\207\0m\12-\224\66]\224D\323\2n\11"
-  "-\224\26\211I\263\5o\12-\224\66KfK\26\0p\14=\204\26C\222\331\6%\14\1q\13="
-  "\204\66\203fK\206\260\0r\11-\224\26\211I,\2s\11-\224\66\203zP\0t\12<\224\65Y"
-  "\64$YQu\11-\224\26\231\223\242\4v\12-\224\26\231-\251E\0w\13-\224\26\231\222(\211"
-  "\322\5x\12-\224\26YR\253\324\2y\13=\204\26\231[\62\204\203\2z\11-\224\26\203\326\66\10"
-  "{\12;\224TI\224dQ\26|\7\71\224\22\207\0}\13;\224\24Y\224%Q\22\1~\7\25\254"
-  "\66\246\4\15=\224\26IV)FI\224(\5\200\5\0\204\20\201\14\265\224x\311\240E\331\240d"
-  "\0\202\7\42\204\63\25\5\203\5\0\204\20\204\11$\204\65\275(\11\0\205\7\15\224\26I\1\206\15>"
-  "\224\67C\22\32\207\207$J\0\207\5\0\204\20\210\5\0\204\20\211\5\0\204\20\212\5\0\204\20\213\5"
-  "\0\204\20\214\5\0\204\20\215\15=\224\27\247%\321\224!\31\6\1\216\15=\224\27\207H\31\224A\221"
-  "\206!\217\14?\224\30oSdQ\267\341\0\220\6\33\247\37\17\221\7\32\264\23I\24\222\7\32\264\63"
-  "\211\2\223\10\34\264\25IS\22\224\10\34\264\65-J\2\225\6\33\244\24\17\226\7\15\254\26\203\0\227"
-  "\5\0\204\20\230\5\0\204\20\231\5\0\204\20\232\5\0\204\20\233\5\0\204\20\234\5\0\204\20\235\5\0"
-  "\204\20\236\5\0\204\20\237\5\0\204\20\240\5\0\204\20\241\5\0\204\20\242\5\0\204\20\243\14=\224V"
-  "R%\33\242\60\33\4\244\5\0\204\20\245\5\0\204\20\246\5\0\204\20\247\5\0\204\20\250\5\0\204\20"
-  "\251\5\0\204\20\252\5\0\204\20\253\5\0\204\20\254\5\0\204\20\255\5\0\204\20\256\5\0\204\20\257\5"
-  "\0\204\20\260\12$\254\65J$%\12\0\0\0\0";
+static const uint8_t NatRailSmall9[1329] U8G2_FONT_SECTION("NatRailSmall9") =
+  "\221\0\3\2\4\4\4\5\5\11\11\0\0\11\0\11\2\1E\2\214\5\30 \5\0\230)!\7q("
+  "%\6%\42\10\63h)\22K\0#\17u(mJI\62(\225A)%\11\0$\14u(\255\262"
+  "\245\266%\311\26\1%\14t(+\42E\212\244H\221\2&\16u(m\244\222\224$R\22EJ\0"
+  "'\6\61h%\6(\11s(\251\222R\255\0)\11s()\262R\245\4*\12U\70-\222\312b"
+  "Y\32+\12U\70\255\302h\220\302\10,\7\62\10g\22\5-\6\23X)\6.\6\21(%\2/"
+  "\13t(\353\42)\222\42)\3\60\12u(m\226\314[\262\0\61\11s)m\22\251\313\0\62\13u"
+  "(m\226,\314\332\6\1\63\14u(m\226,\214T-Y\0\64\15u(\355\62))%\203\26&"
+  "\0\65\13u(-\216C\32j\311\2\66\15u(m\226L\34\222LK\26\0\67\12u(-\6\61"
+  "+\66\1\70\15u(m\226LK\226LK\26\0\71\15u(m\226LK\206PK\26\0:\7A"
+  "\70%\242\0;\7R(gR\5<\10t(\353\242\306\6=\10\64H+\206p\10>\11t(+"
+  "\302\246\66\0?\14u(m\226,\214\264\34\212\0@\14u(m\226\314\222(C\272\0A\13u("
+  "m\226L\33\206\314\26B\15u(-\206$\323\6%\323\6\5C\13u(m\226LlK\26\0D"
+  "\13u(-\206$\363\66(\0E\13u(-\216\341\220\204\341 F\13u(-\216\341\220\204E\0"
+  "G\15u(m\226LL\206LK\26\0H\13u(-\62\333\60d\266\0I\7q(%\16\1J"
+  "\11u(-;j\311\2K\15u(-\62))iIT\311\2L\11u(-\302\36\7\1M\13"
+  "u(-\262eI\64\267\0N\13u(-\262II\244\315\26O\12u(m\226\314[\262\0P\14"
+  "u(-\206$\323\6%,\2Q\13\225\10m\226\314[\62\246\1R\15u(-\206$\323\6\245T"
+  "\311\2S\13u(m\226L]\265d\1T\11u(-\6)\354\11U\11u(-\62\337\222\5V"
+  "\12u(-\62oI-\2W\13u(-\62\227DIn\1X\14u(-\62-\251UjZ\0"
+  "Y\13u(-\62-\251\205M\0Z\12u(-\6\61\353\70\10[\10r('\226.\2\134\12t"
+  "(+\62-\323\62-]\10r(\63\224.\3^\6#xi\32_\7\24\30+\206\0`\7\42x"
+  "'\242\0a\12U(m\326d\320\222!b\13u(-\302\212I\323\6\5c\11U(m\6\261:"
+  "\4d\13u(-+\246MK\206\0e\12U(m\226l\30\322!f\12t(\253*\245)+\1"
+  "g\14u\10m\6\315\226\14\341\240\0h\12u(-\302\212I\263\5i\7q(%\222Aj\13\224"
+  "\10\353r k\223\22\5k\13t(+\262\222\222HI)l\7q(%\16\1m\12U(m\272"
+  "(\211\246\5n\11U(-\22\223f\13o\12U(m\226\314\226,\0p\14u\10-\206$\263\15"
+  "J\30\2q\13u\10m\6\315\226\14a\1r\11U(-\22\223X\4s\11U(m\6\365\240\0"
+  "t\13t(k\262hH\262\242\0u\11U(-\62'E\11v\12U(-\62[R\213\0w\14"
+  "U(-\62%Q\22\245\13\0x\12U(-\262\244V\251\5y\13u\10-\62\267d\10\7\5z"
+  "\11U(-\6\255m\20{\12s(\251\222(\311\242,|\7q(%\16\1}\13s()\262("
+  "K\242$\2~\10%XmL\11\0\15u(-\222\254R\214\222(Q\12\200\5\0\10!\201\14"
+  "e)\361\222A\213\262A\311\0\202\10B\10g*\12\0\203\5\0\10!\204\11D\10kzQ\22\0"
+  "\205\7\25(-\222\2\206\15v(o\206$\64\16\17I\224\0\207\16w(\261\266\244)\262\250I\226"
+  "M\0\210\21\210\30\63\323!\213\222d\213\262\245\224\15i\10\211\5\0\10!\212\5\0\10!\213\5\0"
+  "\10!\214\5\0\10!\215\15u(/NK\242)C\62\14\2\216\16u(/\16\221\62(\203\42\15"
+  "C\0\217\14w(\61\336\246\310\242n\303\1\220\6\63N?\36\221\7\62h'\222(\222\7\62hg"
+  "\22\5\223\10\64h+\222\246$\224\10\64hkZ\224\4\225\6\63H)\36\226\7\25X-\6\1\227"
+  "\5\0\10!\230\5\0\10!\231\5\0\10!\232\5\0\10!\233\5\0\10!\234\5\0\10!\235\5\0"
+  "\10!\236\5\0\10!\237\5\0\10!\240\5\0\10!\241\5\0\10!\242\5\0\10!\243\14u(\255"
+  "\244J\66Da\66\10\244\5\0\10!\245\5\0\10!\246\5\0\10!\247\5\0\10!\250\5\0\10!"
+  "\251\5\0\10!\252\5\0\10!\253\5\0\10!\254\5\0\10!\255\5\0\10!\256\5\0\10!\257\5"
+  "\0\10!\260\12DXk\224HJ\24\0\0\0\0";
 
-static uint8_t NatRailTall12[1064] U8G2_FONT_SECTION("NatRailTall12") =
-  "a\0\3\2\4\4\2\5\5\11\14\0\375\11\375\11\0\1Q\2\235\4\17 \5\0f\12!\7\221B"
+static uint8_t NatRailTall12[1102] U8G2_FONT_SECTION("NatRailTall12") =
+  "c\0\3\2\4\4\2\5\5\11\14\0\375\11\375\11\0\1Q\2\235\4\65 \5\0f\12!\7\221B"
   "\211C\22\42\7#^\212D\11#\21\225B\233R\222\14J)\211\222dPJI\2$\17\225B\253"
   "l)%\331\226DI\262E\0%\12\225B\313i\312:\35\1&\20\225B\33\251\22%Q$%\211"
   "\224D\221\22'\6!^\11\1(\11\223B\252\244\324\255\0)\11\223B\212\254\324\245\4*\14uF"
@@ -235,7 +233,8 @@ static uint8_t NatRailTall12[1064] U8G2_FONT_SECTION("NatRailTall12") =
   "\0z\12eB\213A\314\332\6\1{\21\227B\234,\321\226\245\247\310\242&Y\222,\1|\6\221B"
   "\213\7}\17\266\66\273\70\31\306:\26\206\303\22g\0~\21\226\302\233!\31\206P\34\36\24e\30\222"
   "(\1\16\226\302\213$\314\224(\315\222,\351?\200\24\231B\255AK\223L\222B)\224BMJ"
-  "\322l\220\0\0\0\0";
+  "\322l\220\0\201\24\231>\255AK\223,\323\62-\323\26\35H\322l\220\0\202\22\231>\335t\320*"
+  "\311\30\245Q\270\324\262AM\1\0\0\0";
 
 static const uint8_t NatRailClockSmall7[137] U8G2_FONT_SECTION("NatRailClockSmall7") =
   "\12\0\3\3\3\3\3\1\5\7\7\0\0\7\0\7\0\0\0\0\0\0p\60\12?\343Td\274I*"
@@ -252,8 +251,8 @@ static const uint8_t NatRailClockLarge9[177] U8G2_FONT_SECTION("NatRailClockLarg
   "\201\234\252Ur\32\1\70\17\231T\307\205\24+\211\13)V\22\27\0\71\20\231T\307\205\24+\211\203"
   "\70\71*\211\13\0:\7r\235\2\31\1\0\0\0";
 
-static const uint8_t Underground10[1332] U8G2_FONT_SECTION("Underground10") =
-  "\221\0\3\2\3\4\4\5\5\11\12\0\377\11\377\11\0\1^\2\310\5\33 \5\0\314\25!\7I\204"
+static const uint8_t Underground10[1335] U8G2_FONT_SECTION("Underground10") =
+  "\221\0\3\2\3\4\4\5\5\11\12\0\377\11\377\11\0\1^\2\310\5\36 \5\0\314\25!\7I\204"
   "\22\207$\42\7\23\274\24\211\22#\21M\204\66\245$\31\224R\22%\311\240\224\222\4$\17M\204V"
   "\331RJ\262-\211\222d\213\0%\12M\204\226\323\224u:\2&\17F\204\67Z\324\246E\211\226D"
   "I\42\5'\10\42\254\23C\242\0(\10J\204\63J\237\2)\11J\204\23Q\322\213\2*\14=\214"
@@ -286,15 +285,15 @@ static const uint8_t Underground10[1332] U8G2_FONT_SECTION("Underground10") =
   "\65\214\26\231[R\213\0w\13\67\214\30\251S\244tK\0x\13\65\214\26YR\13\263\244\26y\13"
   "E|\26\231\267d\10\7\5z\12\65\214\26\203V\314\262A{\13K\204TIT\311\242Z\0|\6"
   "I\204\26\17}\13K\204\24YTK\242J\4~\21N\204\67C\62\14\241\70<(\312\60$Q\2"
-  "\16N\204\27I\230)Q\232%Y\322\200\5\0\204\20\201\5\0\314\21\202\5\0\204\20\203\5\0"
-  "\204\20\204\5\0\204\20\205\5\0\204\20\206\5\0\204\20\207\5\0\204\20\210\5\0\204\20\211\5\0\204\20"
-  "\212\5\0\204\20\213\5\0\204\20\214\5\0\204\20\215\5\0\204\20\216\5\0\204\20\217\5\0\204\20\220\6"
-  "\33\237\37\17\221\5\0\204\20\222\5\0\204\20\223\5\0\204\20\224\5\0\204\20\225\5\0\204\20\226\5\0"
-  "\204\20\227\5\0\204\20\230\5\0\204\20\231\5\0\204\20\232\5\0\204\20\233\5\0\204\20\234\5\0\204\20"
-  "\235\5\0\204\20\236\5\0\204\20\237\5\0\204\20\240\5\0\204\20\241\5\0\204\20\242\5\0\204\20\243\14"
-  "=\214VR%\33\242\60\33\4\244\5\0\204\20\245\5\0\204\20\246\5\0\204\20\247\5\0\204\20\250\5"
-  "\0\204\20\251\5\0\204\20\252\5\0\204\20\253\5\0\204\20\254\5\0\204\20\255\5\0\204\20\256\5\0\204"
-  "\20\257\5\0\204\20\260\12-\244\66KfK\26\0\0\0\0";
+  "\16N\204\27I\230)Q\232%Y\322\200\5\0\204\20\201\10\25\204\26I\242\24\202\5\0\204\20"
+  "\203\5\0\204\20\204\5\0\204\20\205\5\0\204\20\206\5\0\204\20\207\5\0\204\20\210\5\0\204\20\211\5"
+  "\0\204\20\212\5\0\204\20\213\5\0\204\20\214\5\0\204\20\215\5\0\204\20\216\5\0\204\20\217\5\0\204"
+  "\20\220\6\33\237\37\17\221\5\0\204\20\222\5\0\204\20\223\5\0\204\20\224\5\0\204\20\225\5\0\204\20"
+  "\226\5\0\204\20\227\5\0\204\20\230\5\0\204\20\231\5\0\204\20\232\5\0\204\20\233\5\0\204\20\234\5"
+  "\0\204\20\235\5\0\204\20\236\5\0\204\20\237\5\0\204\20\240\5\0\204\20\241\5\0\204\20\242\5\0\204"
+  "\20\243\14=\214VR%\33\242\60\33\4\244\5\0\204\20\245\5\0\204\20\246\5\0\204\20\247\5\0\204"
+  "\20\250\5\0\204\20\251\5\0\204\20\252\5\0\204\20\253\5\0\204\20\254\5\0\204\20\255\5\0\204\20\256"
+  "\5\0\204\20\257\5\0\204\20\260\12-\244\66KfK\26\0\0\0\0";
 
 static const uint8_t UndergroundClock8[150] U8G2_FONT_SECTION("UndergroundClock8") =
   "\13\0\3\3\3\4\2\2\5\7\10\0\0\10\0\10\0\0\0\0\0\0}\60\12G\305\251\310\370&\251"
@@ -305,20 +304,38 @@ static const uint8_t UndergroundClock8[150] U8G2_FONT_SECTION("UndergroundClock8
 
 // Service attribution texts
 static const char nrAttributionn[] = "Powered by National Rail Enquiries";
+static const char rdgAttribution[] = "Powered by Rail Delivery Group";
 static const char btAttribution[] = "Powered by bustimes.org";
-
-//
-// GitHub Client for firmware updates
-//
-github ghUpdate("","");
 
 #define SCREENSAVERINTERVAL 8000      // How often the screen is changed in sleep mode (ms - 8 seconds)
 #define DATAUPDATEINTERVAL 90000      // How often we fetch data from National Rail (ms - 1.5 mins) - "default" option
 #define FASTDATAUPDATEINTERVAL 45000  // How often we fetch data from National Rail (ms - 45 secs) - "fast" option
-#define UGDATAUPDATEINTERVAL 35000    // How often we fetch data from TfL (ms - 35 secs)
+#define UGDATAUPDATEINTERVAL 30000    // How often we fetch data from TfL (ms - 30 secs)
 #define BUSDATAUPDATEINTERVAL 45000   // How often we fetch data from bustimes.org (ms - 45 secs)
 #define RSSUPDATEINTERVAL 600000      // How often to refresh the RSS feed (ms - 10 mins)
 #define WEATHERUPDATEINTERVAL 1200000 // How often to update the weather forecast (ms - 20 mins)
+
+// Reusable data transfer structures
+rdiStation xfrStation;
+stnMessages xfrMessages;
+busTubeStation xfrBusTubeStation;
+sharedBufferSpace jsonKeyBuffer;
+
+// Station Data (shared)
+rdStation station;
+// Station Messages (shared)
+stnMessages messages;
+
+// Data transfer clients
+rdmRailClient rdmRailData(&xfrStation,&xfrMessages,&jsonKeyBuffer);
+raildataXmlClient darwinRailData(&xfrStation,&xfrMessages,&jsonKeyBuffer);
+TfLdataClient tfldata(&xfrBusTubeStation,&xfrMessages,&jsonKeyBuffer);
+busDataClient busdata(&xfrBusTubeStation,&jsonKeyBuffer);
+weatherClient currentWeather(&jsonKeyBuffer);
+rssClient rss(&jsonKeyBuffer);
+github ghUpdate(&jsonKeyBuffer);
+
+static char weatherMsg[MAXWEATHERSIZE];
 
 // Bit and bobs
 static unsigned long timer = 0;
@@ -345,7 +362,7 @@ static bool firstLoad = true;              // Are we loading for the first time 
 static int prevProgressBarPosition=0;      // Used for progress bar smooth animation
 static int startupProgressPercent;         // Initialisation progress
 static bool wifiConnected = false;         // Connected to WiFi?
-volatile unsigned long nextDataUpdate = 0;   // Next National Rail update time (millis)
+volatile unsigned long nextDataUpdate = 0; // Next National Rail update time (millis)
 static int dataLoadSuccess = 0;            // Count of successful data downloads
 static int dataLoadFailure = 0;            // Count of failed data downloads
 static unsigned long lastLoadFailure = 0;  // When the last failure occurred
@@ -354,24 +371,29 @@ static unsigned long lastDataLoadTime = 0; // Timestamp of last data load
 static long apiRefreshRate = DATAUPDATEINTERVAL; // User selected refresh rate for National Rail API (90/45 secs)
 static int dateWidth;                      // Width of the displayed date in pixels
 static int dateDay;                        // Day of the month of displayed date
-static bool altStationEnabled = false;     // Switch between stations based on time of day
-static bool altStationActive = false;      // Is the alternate station currently shown
-static byte altStarts = 12;                // Hour at which to switch to the alternate station
-static byte altEnds = 23;                  // Hour at which to switch back to the default station
 static bool noScrolling = false;           // Suppress all horizontal scrolling
 static bool flipScreen = false;            // Rotate screen 180deg
 static String timezone = "";               // custom (non UK) timezone for the clock
 static bool hidePlatform = false;          // Hide platform numbers on Rail board?
-static bool hideOrdinals = false;           // Hide service ordinals (2nd, 3rd, 4th etc.)
+static bool hideOrdinals = false;          // Hide service ordinals (2nd, 3rd, 4th etc.)
 static bool showLastSeen = false;          // Include last reported arrival after the calling at list
-static bool showFullMsgs = true;           // Wait for the "Calling at" / service messages to finish scrolling before changing primary service?
+static bool showFullCalling = true;        // Wait for the "Calling at" list to finish scrolling before changing the primary service
+static bool showFullMsgs = true;           // Wait for the current service message or RSS feed to finish scrolling before changing primary service
+static bool showServiceMsgs = true;        // Show station and service messages (rail/tube)
+static bool showTubeCurrentLocation=false; // Show the current location of the primary tube service
 static int nrTimeOffset = 0;               // Offset minutes for Rail departures display
 static int prevUpdateCheckDay;             // Day of the month the last daily firmware update check was made
 static unsigned long fwUpdateCheckTimer=0; // Next time to check if the day has rolled over for firmware update check
 static bool apiKeys = false;               // Does apikeys.json exist?
 static bool touchEnabled = false;          // TTP223 Touch Sensor installed?
-static bool touchOverrideAlt = false;      // Touch/Button has switched to/from alternate station
-
+static bool useRDMclient = false;          // Use the new Rail Data Marketplace API instead of Darwin Lite
+static bool enableScheduler = false;
+static bool enableCarousel = false;
+static int numCarouselSlots = 0;
+static int currentCarouselSlot = 0;
+static int numScheduleSlots = 0;
+static int currentScheduleSlot = 0;
+static unsigned long nextSchedulerCheck = 0;
 static char hostname[33];                  // Network hostname (mDNS)
 static char myUrl[24];                     // Stores the board's own url
 
@@ -379,38 +401,34 @@ static char myUrl[24];                     // Stores the board's own url
 static bool wifiConfigured = false;        // Has WiFi Manager used the captive portal
 
 // Station Board Data
+static char locationCode[13];              // CRS, Naptan or Atco code of active location
+static char locationName[MAXLOCATIONSIZE]; // Station/Bus stop long name
+static char locationFilter[MAXFILTERSIZE];
+static char locationCleanFilter[MAXFILTERSIZE];
+static float locationLat=0;
+static float locationLon=0;
+static bool railIsSet = false;
+static bool tubeIsSet = false;
+static bool busIsSet = false;
+static bool schedulerActive = false;
+static bool carouselActive = false;
+static int activeSlotEventTime;
+static int nextSlotEventTime;
+
 static char nrToken[37] = "";              // National Rail Darwin Lite Tokens are in the format nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn, where each 'n' represents a hexadecimal character (0-9 or a-f).
-static char crsCode[4] = "";               // Station code (3 character)
-static float stationLat=0;                 // Selected station Latitude/Longitude (used to get weather for the location)
-static float stationLon=0;
+static String rdmDeparturesApiKey = "";    // RDM Consumer key for DeparturesBoard API
+static String rdmServiceApiKey = "";       // RDM Consumer key for ServiceDetails API
+static char tflAppKey[33] = "";            // TfL app_key (not usually needed)
 static char callingCrsCode[4] = "";        // Station code to filter routes on
 static char callingStation[45] = "";       // Calling filter station friendly name
-static char platformFilter[MAXPLATFORMFILTERSIZE]; // CSV list of platforms to filter on
-static char cleanPlatformFilter[MAXPLATFORMFILTERSIZE]; // Cleaned up platform filter (for performance)
-static char altCrsCode[4] = "";            // Station code of alternate station
-static float altLat=0;                     // Alternate station Latitude/Longitude (used to get weather for the location)
-static float altLon=0;
-static char altCallingCrsCode[4];          // Station code to filter routes on (when alternate station active)
-static char altCallingStation[45] = "";    // Calling filter station friendly name (when alternate station active)
-static char altPlatformFilter[MAXPLATFORMFILTERSIZE]; // CSV list of platforms to filter on
-static String tflAppkey = "";              // TfL API Key
-static char tubeId[13] = "";               // Underground station naptan id
-static String tubeName="";                 // Underground Station Name
 static char lineId[33];                    // Underground line to filter on
 static char lineDirection[9];              // Underground direction filter
-static float tubeLat=0;                    // Underground station Latitude/Longitude (used to get weather for the location)
-static float tubeLon=0;
-static char busAtco[13]="";                // Bus Stop ATCO location
-static String busName="";                  // Bus Stop long name
 static int busDestX;                       // Variable margin for bus destination
-static char busFilter[MAXBUSFILTERSIZE]=""; // CSV list of services to filter on
-static char cleanBusFilter[MAXBUSFILTERSIZE]; // Cleaned up bus filter (for performance)
-static float busLat=0;                     // Bus stop Latitude/Longitude (used to get weather for the location)
-static float busLon=0;
 
-// board has three possible modes.
 enum boardModes {
   MODE_LOADCONFIG = -1,
+  MODE_NEXTMODE = -2,
+  MODE_NEXTSCHEDULE = -3,
   MODE_RAIL = 0,
   MODE_TUBE = 1,
   MODE_BUS = 2
@@ -424,9 +442,9 @@ static char wsdlHost[MAXHOSTSIZE];         // wsdl Host name
 static char wsdlAPI[MAXAPIURLSIZE];        // wsdl API url
 
 // Coach class availability
-static const char firstClassSeating[] PROGMEM = " First class seating only.";
-static const char standardClassSeating[] PROGMEM = " Standard class seating only.";
-static const char dualClassSeating[] PROGMEM = " First and Standard class seating available.";
+static const char firstClassSeating[] = " First class seating only.";
+static const char standardClassSeating[] = " Standard class seating only.";
+static const char dualClassSeating[] = " First and Standard class seating available.";
 
 // Animation
 #define frameTimeRail 25
@@ -437,6 +455,7 @@ static int scrollStopsXpos = 0;
 static int scrollStopsYpos = 0;
 static int scrollStopsLength = 0;
 static bool isScrollingStops = false;
+static bool isShowingCalling = false;
 static int currentMessage = 0;
 static int prevMessage = 0;
 static int prevScrollStopsLength = 0;
@@ -457,19 +476,16 @@ static int scrollPrimaryYpos = 0;
 static bool isScrollingPrimary = false;
 static bool attributionScrolled = false;
 
-static char displayedTime[29] = "";        // The currently displayed time
-static unsigned long nextClockUpdate = 0;  // Next time we need to check/update the clock display
-static int fpsDelay=25;                    // Total ms between text movement (for smooth animation)
+static char displayedTime[9] = "";        // The currently displayed time
+static char currentTime[9] = "";          // The current time (keep updated in loop)
+static unsigned long lastTimeUpdate = 0;
 static unsigned long refreshTimer = 0;
 
 // Weather Stuff
-static char weatherMsg[46];                            // Current weather at station location
 static unsigned long nextWeatherUpdate = 0;            // When the next weather update is due
 static String openWeatherMapApiKey = "";               // The API key to use
-weatherClient currentWeather;                          // Create a weather client
 
 // RSS Client
-rssClient rss;                                         // Create a RSS client
 static bool rssEnabled = false;                        // Add RSS feed to the messages
 static bool rssPriority = false;                       // Prioritise RSS feed
 static unsigned long nextRssUpdate = 0;                // When the next RSS update is due
@@ -477,16 +493,6 @@ static String rssURL;                                  // RSS URL to use
 static String rssName;                                 // Name of feed for atrribution
 static char rssMessage[MAXMESSAGESIZE] = "";           // Holds the current, formatted, RSS message
 
-// RailData XML Client
-raildataXmlClient* raildata = nullptr;
-// TfL Client
-TfLdataClient* tfldata = nullptr;
-// Bus Client
-busDataClient* busdata = nullptr;
-// Station Data (shared)
-rdStation station;
-// Station Messages (shared)
-stnMessages messages;
 
 // Optional TTP223 touch sensor / push button
 touchSensor button(GPIO_NUM_34);
@@ -521,36 +527,20 @@ int getStringWidth(const char *message) {
   return u8g2.getStrWidth(message);
 }
 
-int getStringWidth(const __FlashStringHelper *message) {
-  String temp = String(message);
-  char buff[temp.length()+1];
-  temp.toCharArray(buff,sizeof(buff));
-  return u8g2.getStrWidth(buff);
-}
-
-void drawTruncatedText(const char *message, int line) {
+void drawTruncatedText(const char *message, int line, int x) {
   char buff[strlen(message)+4];
-  int maxWidth = SCREEN_WIDTH - 6;
+  int maxWidth = SCREEN_WIDTH - 6 - x;
   strcpy(buff,message);
   int i = strlen(buff);
   while (u8g2.getStrWidth(buff)>maxWidth && i) buff[i--] = '\0';
   strcat(buff,"...");
-  u8g2.drawStr(0,line,buff);
+  u8g2.drawStr(x,line,buff);
 }
 
 void centreText(const char *message, int line) {
   int width = u8g2.getStrWidth(message);
   if (width<=SCREEN_WIDTH) u8g2.drawStr((SCREEN_WIDTH-width)/2,line,message);
-  else drawTruncatedText(message,line);
-}
-
-void centreText(const __FlashStringHelper *message, int line) {
-  String temp = String(message);
-  char buff[temp.length()+1];
-  temp.toCharArray(buff,sizeof(buff));
-  int width = u8g2.getStrWidth(buff);
-  if (width<=SCREEN_WIDTH) u8g2.drawStr((SCREEN_WIDTH-width)/2,line,buff);
-  else drawTruncatedText(buff,line);
+  else drawTruncatedText(message,line,0);
 }
 
 void drawProgressBar(int percent) {
@@ -585,13 +575,6 @@ void progressBar(const char *text, int percent) {
   drawProgressBar(percent);
 }
 
-void progressBar(const __FlashStringHelper *text, int percent) {
-  u8g2.setFont(NatRailSmall9);
-  blankArea(0,24,256,25);
-  centreText(text,24);
-  drawProgressBar(percent);
-}
-
 void drawFirmware() {
   char firmware[16];
   sprintf(firmware,"B%d.%d-W%d.%d",VERSION_MAJOR,VERSION_MINOR,WEBAPPVER_MAJOR,WEBAPPVER_MINOR);
@@ -600,7 +583,7 @@ void drawFirmware() {
 
 void drawStartupHeading() {
   u8g2.setFont(NatRailTall12);
-  centreText(F("Departures Board"),0);
+  centreText("Departures Board",0);
   u8g2.setFont(NatRailSmall9);
   drawFirmware();
 }
@@ -616,65 +599,77 @@ void drawStationHeader(const char *stopName, const char *callingStopName, const 
 
   u8g2.setFont(NatRailSmall9);
   char boardTitle[95];
-  String title = String(stopName) + " ";
-  if (timeOffset) {
-    title+="\x8F";
-    if (timeOffset>0) title+="+";
-    title+=String(timeOffset) + "m ";
-  }
-  if (platFilter[0]) { title+=(boardMode == MODE_BUS)?"\x8E":"\x8D"; title+=String(platFilter) + " "; }
-  if (callingStopName[0]) title+="(\x81" + String(callingStopName) + ")";
-  title.trim();
-  strncpy(boardTitle,title.c_str(),sizeof(boardTitle));
+  strlcpy(boardTitle,stopName,sizeof(boardTitle));
+  if (timeOffset || platFilter[0] || callingStopName[0]) strlcat(boardTitle," ",sizeof(boardTitle));
 
+  if (timeOffset) {
+    char offset[9];
+    sprintf(offset,"\x8F%+dm ",timeOffset);
+    strlcat(boardTitle,offset,sizeof(boardTitle));
+  }
+  if (platFilter[0]) {
+    strlcat(boardTitle,(boardMode == MODE_BUS)?"\x8E":"\x8D",sizeof(boardTitle));
+    strlcat(boardTitle,platFilter,sizeof(boardTitle));
+    strlcat(boardTitle," ",sizeof(boardTitle));
+  }
+  if (callingStopName[0]) {
+    strlcat(boardTitle,"(\x81",sizeof(boardTitle));
+    strlcat(boardTitle,callingStopName,sizeof(boardTitle));
+    strlcat(boardTitle,")",sizeof(boardTitle));
+  }
+
+  int titleOffset = 0;
+  if (schedulerActive || carouselActive) titleOffset = 13;
   int boardTitleWidth = getStringWidth(boardTitle);
 
   if (dateEnabled) {
     int const dateY=55;
     // Get the date
     char sysTime[29];
-    getLocalTime(&timeinfo);
     strftime(sysTime,29,"%a %d %b",&timeinfo);
     dateWidth = getStringWidth(sysTime);
     dateDay = timeinfo.tm_mday;
-    if (callingStopName[0] || boardTitleWidth+dateWidth+10>=SCREEN_WIDTH) {
+    if (callingStopName[0] || boardTitleWidth+dateWidth+10+titleOffset>=SCREEN_WIDTH) {
       blankArea(SCREEN_WIDTH-70,dateY,70,SCREEN_HEIGHT-dateY);
       u8g2.drawStr(SCREEN_WIDTH-dateWidth,dateY-1,sysTime); // Date bottom right
-      centreText(boardTitle,LINE0-1);
+      if (boardTitleWidth+titleOffset < SCREEN_WIDTH) centreText(boardTitle,LINE0-1);
+      else drawTruncatedText(boardTitle,LINE0-1,titleOffset);
     } else {
       u8g2.drawStr(SCREEN_WIDTH-dateWidth,LINE0-1,sysTime); // right-aligned date top
       if ((SCREEN_WIDTH-boardTitleWidth)/2 < dateWidth+8) {
         // station name left aligned
-        u8g2.drawStr(0,LINE0-1,boardTitle);
+        u8g2.drawStr(titleOffset,LINE0-1,boardTitle);
       } else {
         centreText(boardTitle,LINE0-1);
       }
     }
   } else {
-    centreText(boardTitle,LINE0-1);
+    if (boardTitleWidth+titleOffset < SCREEN_WIDTH) centreText(boardTitle,LINE0-1);
+    else drawTruncatedText(boardTitle,LINE0-1,titleOffset);
   }
+
+  if (titleOffset) u8g2.drawStr(0,LINE0-1,schedulerActive?"\x87":"\x88");
 }
 
 // Draw the NR clock (if the time has changed)
-void drawCurrentTime(bool update) {
-  char sysTime[29];
-  getLocalTime(&timeinfo);
+void drawCurrentTime() {
+  char timeSeg[7];
 
-  sprintf(sysTime,"%02d:%02d:",timeinfo.tm_hour,timeinfo.tm_min);
-  if (strcmp(displayedTime,sysTime)) {
+  if (strcmp(displayedTime,currentTime)) {
     u8g2.setFont(NatRailClockLarge9);
     blankArea(96,LINE4,64,SCREEN_HEIGHT-LINE4);
-    u8g2.drawStr(96,LINE4-1,sysTime);
+    strlcpy(timeSeg,currentTime,7);
+    u8g2.drawStr(96,LINE4-1,timeSeg);
     u8g2.setFont(NatRailClockSmall7);
-    sprintf(sysTime,"%02d",timeinfo.tm_sec);
-    u8g2.drawStr(144,LINE4+1,sysTime);
+    strcpy(timeSeg,currentTime+6);
+    u8g2.drawStr(144,LINE4+1,timeSeg);
     u8g2.setFont(NatRailSmall9);
-    if (update) u8g2.updateDisplayArea(12,6,8,2);
-    strcpy(displayedTime,sysTime);
+    u8g2.updateDisplayArea(12,6,8,2);
+    strcpy(displayedTime,currentTime);
     if (dateEnabled && timeinfo.tm_mday!=dateDay) {
       // Need to update the date on screen
-      drawStationHeader(station.location,callingStation,platformFilter,nrTimeOffset);
-      if (update) u8g2.sendBuffer();  // Just refresh on new date
+      drawStationHeader(station.location,callingStation,locationFilter,nrTimeOffset);
+      u8g2.sendBuffer();  // Just refresh on new date
     }
   }
 }
@@ -687,7 +682,6 @@ void drawSleepingScreen() {
   u8g2.setContrast(DIMMED_BRIGHTNESS);
   u8g2.clearBuffer();
   if (sleepClock) {
-    getLocalTime(&timeinfo);
     sprintf(sysTime,"%02d:%02d",timeinfo.tm_hour,timeinfo.tm_min);
     strftime(sysDate,29,"%d %B %Y",&timeinfo);
 
@@ -723,11 +717,11 @@ void showUpdateIcon(bool show) {
 void showSetupScreen() {
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
-  centreText(F("Departures Board first-time setup"),0);
+  centreText("Departures Board first-time setup",0);
   u8g2.setFont(NatRailSmall9);
-  centreText(F("To configure Wi-Fi, please connect to the"),18);
-  centreText(F("the \"Departures Board\" network and go to"),32);
-  centreText(F("http://192.168.4.1 in a web browser."),46);
+  centreText("To configure Wi-Fi, please connect to the",18);
+  centreText("the \"Departures Board\" network and go to",32);
+  centreText("http://192.168.4.1 in a web browser.",46);
   u8g2.sendBuffer();
 }
 
@@ -737,7 +731,7 @@ void showNoDataScreen() {
   u8g2.setFont(NatRailTall12);
   switch (boardMode) {
     case MODE_RAIL:
-      sprintf(msg,"No data available for station code \"%s\".",crsCode);
+      sprintf(msg,"No data available for station code \"%s\".",locationCode);
       break;
     case MODE_TUBE:
       strcpy(msg,"No data available for the selected station.");
@@ -748,8 +742,8 @@ void showNoDataScreen() {
   }
   centreText(msg,-1);
   u8g2.setFont(NatRailSmall9);
-  centreText(F("Please check you have selected a valid location"),14);
-  centreText(F("Go to the URL below to choose a location..."),26);
+  centreText("Please check you have selected a valid location",14);
+  centreText("Go to the URL below to choose a location...",26);
   centreText(myUrl,40);
   u8g2.sendBuffer();
 }
@@ -758,10 +752,10 @@ void showSetupKeysHelpScreen() {
   u8g2.clearBuffer();
   char msg[60];
   u8g2.setFont(NatRailTall12);
-  centreText(F("Departures Board Setup"),-1);
+  centreText("Departures Board Setup",-1);
   u8g2.setFont(NatRailSmall9);
-  centreText(F("Next, you need to enter your API keys."),16);
-  centreText(F("Please go to the URL below to start..."),28);
+  centreText("Next, you need to enter your API keys.",16);
+  centreText("Please go to the URL below to start...",28);
   u8g2.setFont(NatRailTall12);
   centreText(myUrl,50);
   u8g2.sendBuffer();
@@ -771,10 +765,10 @@ void showSetupCrsHelpScreen() {
   u8g2.clearBuffer();
   char msg[60];
   u8g2.setFont(NatRailTall12);
-  centreText(F("Departures Board Setup"),-1);
+  centreText("Departures Board Setup",-1);
   u8g2.setFont(NatRailSmall9);
-  centreText(F("Next, you need to choose a location. Please"),16);
-  centreText(F("go to the URL below to choose a station..."),28);
+  centreText("Next, you need to choose a location. Please",16);
+  centreText("go to the URL below to choose a station...",28);
   u8g2.setFont(NatRailTall12);
   centreText(myUrl,50);
   u8g2.sendBuffer();
@@ -783,11 +777,11 @@ void showSetupCrsHelpScreen() {
 void showWsdlFailureScreen() {
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
-  centreText(F("The National Rail data feed is unavailable."),-1);
+  centreText("The National Rail data feed is unavailable.",-1);
   u8g2.setFont(NatRailSmall9);
-  centreText(F("WDSL entry point could not be accessed, so the"),14);
-  centreText(F("Departures Board cannot be loaded."),26);
-  centreText(F("Please try again later. :("),40);
+  centreText("WDSL entry point could not be accessed, so the",14);
+  centreText("Departures Board cannot be loaded.",26);
+  centreText("Please try again later. :(",40);
   u8g2.sendBuffer();
 }
 
@@ -797,19 +791,23 @@ void showTokenErrorScreen() {
   u8g2.setFont(NatRailTall12);
   switch (boardMode) {
     case MODE_RAIL:
-      centreText(F("Access to the National Rail database denied."),-1);
-      strcpy(nrToken,"");
+      if (useRDMclient) {
+        centreText("Access to the Rail Delivery Group api denied.",-1);
+      } else {
+        centreText("Access to the National Rail database denied.",-1);
+        strcpy(nrToken,"");
+      }
       break;
     case MODE_TUBE:
-      centreText(F("Access to the TfL database denied."),-1);
+      centreText("Access to the TfL database denied.",-1);
       break;
     case MODE_BUS:
-      centreText(F("Access to the bustimes database denied."),-1);
+      centreText("Access to the bustimes database denied.",-1);
       break;
   }
   u8g2.setFont(NatRailSmall9);
-  centreText(F("You must enter a valid auth token, please"),14);
-  centreText(F("check you have entered it correctly below:"),26);
+  centreText("You must enter a valid api key, please",14);
+  centreText("check you have entered it correctly below:",26);
   sprintf(msg,"%s/keys.htm",myUrl);
   centreText(msg,40);
   u8g2.sendBuffer();
@@ -821,19 +819,19 @@ void showCRSErrorScreen() {
   u8g2.setFont(NatRailTall12);
   switch (boardMode) {
     case MODE_RAIL:
-      sprintf(msg,"The station code \"%s\" is not valid.",crsCode);
+      sprintf(msg,"The station code \"%s\" is not valid.",locationCode);
       break;
     case MODE_TUBE:
       strcpy(msg,"The Underground station is not valid");
       break;
     case MODE_BUS:
-      sprintf(msg,"The atco code \"%s\" is not valid.",busAtco);
+      sprintf(msg,"The atco code \"%s\" is not valid.",locationCode);
       break;
   }
   centreText(msg,-1);
   u8g2.setFont(NatRailSmall9);
-  centreText(F("Please ensure you have selected a valid station."),14);
-  centreText(F("Go to the URL below to choose a station..."),26);
+  centreText("Please ensure you have selected a valid station.",14);
+  centreText("Go to the URL below to choose a station...",26);
   centreText(myUrl,40);
   u8g2.sendBuffer();
 }
@@ -842,24 +840,24 @@ void showFirmwareUpdateWarningScreen(const char *msg, int secs) {
   char countdown[60];
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
-  centreText(F("Firmware Update Available"),-1);
+  centreText("Firmware Update Available",-1);
   u8g2.setFont(NatRailSmall9);
-  centreText(F("A new version of the Departures Board firmware"),14);
+  centreText("A new version of the Departures Board firmware",14);
   sprintf(countdown,"will be installed in %d seconds. This provides:",secs);
   centreText(countdown,26);
   sprintf(countdown,"\"%s\"",msg);
   centreText(countdown,40);
-  centreText(F("* DO NOT REMOVE THE POWER DURING THE UPDATE *"),54);
+  centreText("* DO NOT REMOVE THE POWER DURING THE UPDATE *",54);
   u8g2.sendBuffer();
 }
 
 void showFirmwareUpdateProgress(int percent) {
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
-  centreText(F("Firmware Update in Progress"),-1);
+  centreText("Firmware Update in Progress",-1);
   u8g2.setFont(NatRailSmall9);
-  progressBar(F("Updating Firmware"),percent);
-  centreText(F("* DO NOT REMOVE THE POWER DURING THE UPDATE *"),54);
+  progressBar("Updating Firmware",percent);
+  centreText("* DO NOT REMOVE THE POWER DURING THE UPDATE *",54);
   u8g2.sendBuffer();
 }
 
@@ -878,13 +876,15 @@ void showUpdateCompleteScreen(const char *title, const char *msg1, const char *m
   u8g2.sendBuffer();
 }
 
-void showSwitchScreen(bool switchModes) {
+void showSwitchScreen() {
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
-  if (switchModes) centreText(F("Switching modes"),20);
-  else centreText(F("Switching stations"),20);
+
+  if (carouselActive) centreText("Moving to next carousel slot",20);
+  else if (schedulerActive) centreText("Moving to next scheduler slot",20);
+  else centreText("Switching modes",20);
   u8g2.setFont(NatRailSmall9);
-  centreText(F("Waiting for background process to complete..."),42);
+  centreText("Waiting for background process to complete...",42);
   u8g2.sendBuffer();
 }
 
@@ -925,32 +925,44 @@ String getBuildTime() {
 }
 
 void checkPostWebUpgrade() {
-  String prevGUI = loadFile(F("/webver"));
-  prevGUI.trim();
-  String currentGUI = String(WEBAPPVER_MAJOR) + F(".") + String(WEBAPPVER_MINOR);
-  if (prevGUI != currentGUI) {
-    // clean up old/dev files
-    progressBar(F("Cleaning up following upgrade"),45);
-    LittleFS.remove(F("/index_d.htm"));
-    LittleFS.remove(F("/index.htm"));
-    LittleFS.remove(F("/keys.htm"));
-    LittleFS.remove(F("/nrelogo.webp"));
-    LittleFS.remove(F("/tfllogo.webp"));
-    LittleFS.remove(F("/btlogo.webp"));
-    LittleFS.remove(F("/tube.webp"));
-    LittleFS.remove(F("/nr.webp"));
-    LittleFS.remove(F("/favicon.svg"));
-    LittleFS.remove(F("/favicon.png"));
-    saveFile(F("/webver"),currentGUI);
-  }
-}
+  JsonDocument doc;
+  char prevFirmware[15] = "B0.0-W0.0";
+  char prevGUI[8];
+  char currentGUI[8];
 
-// Check if the NR clock needs to be updated
-void doClockCheck() {
-  if (!firstLoad) {
-    if (millis()>nextClockUpdate) {
-      drawCurrentTime(true);
-      nextClockUpdate=millis()+180;
+  if (LittleFS.exists("/fw.json")) {
+    File file = LittleFS.open("/fw.json", "r");
+    if (file) {
+      DeserializationError error = deserializeJson(doc, file);
+      if (!error) {
+        JsonObject settings = doc.as<JsonObject>();
+
+        if (settings["fw"].is<const char*>()) {
+          strlcpy(prevFirmware,settings["fw"],sizeof(prevFirmware));
+        }
+      }
+      file.close();
+    }
+  }
+
+  if (prevFirmware[0]) {
+    sscanf(prevFirmware,"%*[^ -]-%s",prevGUI);
+    sprintf(currentGUI,"W%d.%d",WEBAPPVER_MAJOR,WEBAPPVER_MINOR);
+    if (strcmp(prevGUI,currentGUI)) {
+      // clean up old/dev files
+      progressBar("Cleaning up following upgrade",45);
+      LittleFS.remove("/index_d.htm");
+      LittleFS.remove("/index.htm");
+      LittleFS.remove("/keys.htm");
+      LittleFS.remove("/nrelogo.webp");
+      LittleFS.remove("/rdglogo.webp");
+      LittleFS.remove("/tfllogo.webp");
+      LittleFS.remove("/btlogo.webp");
+      LittleFS.remove("/tube.webp");
+      LittleFS.remove("/nr.webp");
+      LittleFS.remove("/favicon.svg");
+      LittleFS.remove("/favicon.png");
+      LittleFS.remove("/webver");
     }
   }
 }
@@ -963,24 +975,11 @@ bool isSnoozing() {
     else return false;
   }
   if (!sleepEnabled) return false;
-  getLocalTime(&timeinfo);
   byte myHour = timeinfo.tm_hour;
   if (sleepStarts > sleepEnds) {
     if ((myHour >= sleepStarts) || (myHour < sleepEnds)) return true; else return false;
   } else {
     if ((myHour >= sleepStarts) && (myHour < sleepEnds)) return true; else return false;
-  }
-}
-
-// Returns true if an alternate station is enabled and we're within the activation period
-bool isAltActive() {
-  if (!altStationEnabled) return false;
-  getLocalTime(&timeinfo);
-  byte myHour = timeinfo.tm_hour;
-  if (altStarts > altEnds) {
-    if ((myHour >= altStarts) || (myHour < altEnds)) return true; else return false;
-  } else {
-    if ((myHour >= altStarts) && (myHour < altEnds)) return true; else return false;
   }
 }
 
@@ -998,23 +997,31 @@ void updateMyUrl() {
 void loadApiKeys() {
   JsonDocument doc;
 
-  if (LittleFS.exists(F("/apikeys.json"))) {
-    File file = LittleFS.open(F("/apikeys.json"), "r");
+  if (LittleFS.exists("/apikeys.json")) {
+    File file = LittleFS.open("/apikeys.json", "r");
     if (file) {
       DeserializationError error = deserializeJson(doc, file);
       if (!error) {
         JsonObject settings = doc.as<JsonObject>();
 
-        if (settings[F("nrToken")].is<const char*>()) {
-          strlcpy(nrToken, settings[F("nrToken")], sizeof(nrToken));
+        if (settings["rdmDepKey"].is<const char*>()) {
+          rdmDeparturesApiKey = settings["rdmDepKey"].as<String>();
         }
 
-        if (settings[F("owmToken")].is<const char*>()) {
-          openWeatherMapApiKey = settings[F("owmToken")].as<String>();
+        if (settings["rdmSvcKey"].is<const char*>()) {
+          rdmServiceApiKey = settings["rdmSvcKey"].as<String>();
         }
 
-        if (settings[F("appKey")].is<const char*>()) {
-          tflAppkey = settings[F("appKey")].as<String>();
+        if (settings["nrToken"].is<const char*>()) {
+          strlcpy(nrToken, settings["nrToken"], sizeof(nrToken));
+        }
+
+        if (settings["owmToken"].is<const char*>()) {
+          openWeatherMapApiKey = settings["owmToken"].as<String>();
+        }
+
+        if (settings["appKey"].is<const char*>()) {
+          strlcpy(tflAppKey,settings["appKey"],sizeof(tflAppKey));
         }
         apiKeys = true;
 
@@ -1027,20 +1034,108 @@ void loadApiKeys() {
 }
 
 void resetLocationIds() {
-  strcpy(crsCode,"");
-  strcpy(tubeId,"");
-  strcpy(busAtco,"");
+  strcpy(locationCode,"");
+  railIsSet = false;
+  tubeIsSet = false;
+  busIsSet = false;
+}
+
+void saveFirmwareInfo() {
+  String fw = "{\"fw\":\"B" + String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + "-W" + String(WEBAPPVER_MAJOR) + "." + String(WEBAPPVER_MINOR) + "\"}";
+  saveFile("/fw.json",fw);
 }
 
 // Write a default config file so that the Web GUI works initially (force Tube mode if no NR token)
 void writeDefaultConfig() {
-    String defaultConfig = "{\"crs\":\"\",\"station\":\"\",\"lat\":0,\"lon\":0,\"weather\":" + String((openWeatherMapApiKey.length())?"true":"false") + F(",\"sleep\":false,\"showDate\":false,\"showBus\":false,\"update\":true,\"sleepStarts\":23,\"sleepEnds\":8,\"brightness\":20,\"tubeId\":\"\",\"tubeName\":\"\",\"mode\":") + String((!nrToken[0])?"1":"0") + "}";
-    saveFile(F("/config.json"),defaultConfig);
-    resetLocationIds();
+  String defaultConfig = "{\"crs\":\"\",\"station\":\"\",\"lat\":0,\"lon\":0,\"weather\":" + String((openWeatherMapApiKey.length())?"true":"false") + ",\"sleep\":false,\"showDate\":false,\"showBus\":false,\"update\":true,\"sleepStarts\":23,\"sleepEnds\":8,\"brightness\":20,\"tubeId\":\"\",\"tubeName\":\"\",\"mode\":" + String((!nrToken[0] && rdmDeparturesApiKey=="")?"1":"0") + "}";
+  saveFile("/config.json",defaultConfig);
+  resetLocationIds();
+  saveFirmwareInfo();
+}
+
+bool pruneFromPhrase(char* input, const char* target) {
+  // Find the first occurance of the target word or phrase
+  char* pos = strstr(input,target);
+  // If found, prune from here
+  if (pos) {
+      input[pos - input] = '\0';
+      return true;
+  }
+  return false;
+}
+
+int getTimeInMinutes() {
+  return (timeinfo.tm_hour * 60 + timeinfo.tm_min);
+}
+
+void loadSlot(JsonObjectConst slot, bool isDefault, boardModes requestedMode) {
+  if (requestedMode == MODE_NEXTMODE) {
+    switch (boardMode) {
+      case MODE_RAIL:
+        if (tubeIsSet) boardMode = MODE_TUBE;
+        else if (busIsSet) boardMode = MODE_BUS;
+        break;
+      case MODE_TUBE:
+        if (busIsSet) boardMode = MODE_BUS;
+        else if (railIsSet) boardMode = MODE_RAIL;
+        break;
+      case MODE_BUS:
+        if (railIsSet) boardMode = MODE_RAIL;
+        else if (tubeIsSet) boardMode = MODE_TUBE;
+        break;
+    }
+  } else {
+    if (slot["mode"].is<int>()) boardMode = slot["mode"];
+    else if (slot["tube"].is<bool>()) boardMode = slot["tube"] ? MODE_TUBE : MODE_RAIL; // handle legacy v1.x config
+  }
+
+  switch (boardMode) {
+    case MODE_RAIL:
+      if (slot["crs"].is<const char*>())              strlcpy(locationCode, slot["crs"], sizeof(locationCode));
+      if (slot["platformFilter"].is<const char*>())   strlcpy(locationFilter, slot["platformFilter"], sizeof(locationFilter));
+      if (slot["callingCrs"].is<const char*>())       strlcpy(callingCrsCode, slot["callingCrs"], sizeof(callingCrsCode));
+      if (slot["callingStation"].is<const char*>())   strlcpy(callingStation, slot["callingStation"], sizeof(callingStation));
+      if (slot["lat"].is<float>())                    locationLat = slot["lat"];
+      if (slot["lon"].is<float>())                    locationLon = slot["lon"];
+      break;
+
+    case MODE_TUBE:
+      if (slot["tubeId"].is<const char*>())     strlcpy(locationCode, slot["tubeId"], sizeof(locationCode));
+      if (slot["lineid"].is<const char*>())     strlcpy(lineId, slot["lineid"], sizeof(lineId));
+      if (slot["direction"].is<const char*>())  strlcpy(lineDirection, slot["direction"], sizeof(lineDirection));
+      if (isDefault) {
+        if (slot["tubeName"].is<const char*>()) strlcpy(locationName, slot["tubeName"], sizeof(locationName));
+        if (slot["tubeLat"].is<float>())      locationLat = slot["tubeLat"];
+        if (slot["tubeLon"].is<float>())      locationLon = slot["tubeLon"];
+        pruneFromPhrase(locationName," Underground Station");
+        pruneFromPhrase(locationName," DLR Station");
+        pruneFromPhrase(locationName," (H&C Line)");
+      } else {
+        if (slot["name"].is<const char*>()) strlcpy(locationName, slot["name"], sizeof(locationName));
+        if (slot["lat"].is<float>())          locationLat = slot["lat"];
+        if (slot["lon"].is<float>())          locationLon = slot["lon"];
+      }
+      break;
+
+    case MODE_BUS:
+      if (slot["busId"].is<const char*>())      strlcpy(locationCode, slot["busId"], sizeof(locationCode));
+      if (slot["busFilter"].is<const char*>())  strlcpy(locationFilter, slot["busFilter"], sizeof(locationFilter));
+      if (isDefault) {
+        if (slot["busName"].is<const char*>())    strlcpy(locationName, slot["busName"], sizeof(locationName));
+        if (slot["busLat"].is<float>())           locationLat = slot["busLat"];
+        if (slot["busLon"].is<float>())           locationLon = slot["busLon"];
+      } else {
+        if (slot["name"].is<const char*>())   strlcpy(locationName, slot["name"], sizeof(locationName));
+        if (slot["lat"].is<float>())          locationLat = slot["lat"];
+        if (slot["lon"].is<float>())          locationLon = slot["lon"];
+      }
+      break;
+
+  }
 }
 
 // Load the configuration settings (if they exist, if not create a default set for the Web GUI page to read)
-void loadConfig() {
+void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFIG) {
   JsonDocument doc;
 
   // Set defaults
@@ -1051,82 +1146,156 @@ void loadConfig() {
   timezone = String(ukTimezone);
   resetLocationIds();
 
-  if (LittleFS.exists(F("/config.json"))) {
-    File file = LittleFS.open(F("/config.json"), "r");
+  schedulerActive = false;
+  carouselActive = false;
+
+  if (LittleFS.exists("/config.json")) {
+    File file = LittleFS.open("/config.json", "r");
     if (file) {
       DeserializationError error = deserializeJson(doc, file);
       if (!error) {
         JsonObject settings = doc.as<JsonObject>();
 
-        if (settings[F("crs")].is<const char*>())        strlcpy(crsCode, settings[F("crs")], sizeof(crsCode));
-        if (settings[F("callingCrs")].is<const char*>()) strlcpy(callingCrsCode, settings[F("callingCrs")], sizeof(callingCrsCode));
-        if (settings[F("callingStation")].is<const char*>()) strlcpy(callingStation, settings[F("callingStation")], sizeof(callingStation));
-        if (settings[F("platformFilter")].is<const char*>())  strlcpy(platformFilter, settings[F("platformFilter")], sizeof(platformFilter));
-        if (settings[F("hostname")].is<const char*>())   strlcpy(hostname, settings[F("hostname")], sizeof(hostname));
-        if (settings[F("wsdlHost")].is<const char*>())   strlcpy(wsdlHost, settings[F("wsdlHost")], sizeof(wsdlHost));
-        if (settings[F("wsdlAPI")].is<const char*>())    strlcpy(wsdlAPI, settings[F("wsdlAPI")], sizeof(wsdlAPI));
-        if (settings[F("showDate")].is<bool>())          dateEnabled = settings[F("showDate")];
-        if (settings[F("showBus")].is<bool>())           enableBus = settings[F("showBus")];
-        if (settings[F("showFullMsgs")].is<bool>())      showFullMsgs = settings[F("showFullMsgs")];
-        if (settings[F("sleep")].is<bool>())             sleepEnabled = settings[F("sleep")];
-        if (settings[F("darkSleep")].is<bool>())         sleepClock = !settings[F("darkSleep")];
-        if (settings[F("fastRefresh")].is<bool>())       apiRefreshRate = settings[F("fastRefresh")] ? FASTDATAUPDATEINTERVAL : DATAUPDATEINTERVAL;
-        if (settings[F("weather")].is<bool>() && openWeatherMapApiKey.length())
-                                                    weatherEnabled = settings[F("weather")];
-        if (settings[F("update")].is<bool>())            firmwareUpdates = settings[F("update")];
-        if (settings[F("updateDaily")].is<bool>())       dailyUpdateCheck = settings[F("updateDaily")];
-        if (settings[F("sleepStarts")].is<int>())        sleepStarts = settings[F("sleepStarts")];
-        if (settings[F("sleepEnds")].is<int>())          sleepEnds = settings[F("sleepEnds")];
-        if (settings[F("brightness")].is<int>())         brightness = settings[F("brightness")];
-        if (settings[F("lat")].is<float>())              stationLat = settings[F("lat")];
-        if (settings[F("lon")].is<float>())              stationLon = settings[F("lon")];
+        // Load common settings
+        if (settings["crs"].is<const char*>() && strlen(settings["crs"])) railIsSet = true; else railIsSet = false;
+        if (settings["tubeId"].is<const char*>() && strlen(settings["tubeId"])) tubeIsSet = true; else tubeIsSet = false;
+        if (settings["busId"].is<const char*>() && strlen(settings["busId"])) busIsSet = true; else busIsSet = false;
 
-        if (settings[F("mode")].is<int>())               boardMode = settings[F("mode")];
-        else if (settings[F("tube")].is<bool>())         boardMode = settings[F("tube")] ? MODE_TUBE : MODE_RAIL; // handle legacy v1.x config
-        if (settings[F("tubeId")].is<const char*>())     strlcpy(tubeId, settings[F("tubeId")], sizeof(tubeId));
-        if (settings[F("tubeName")].is<const char*>())   tubeName = settings[F("tubeName")].as<String>();
-        if (settings[F("lineid")].is<const char*>())     strlcpy(lineId, settings[F("lineid")], sizeof(lineId));
-        if (settings[F("direction")].is<const char*>())  strlcpy(lineDirection, settings[F("direction")], sizeof(lineDirection));
-        if (settings[F("tubeLat")].is<float>())          tubeLat = settings[F("tubeLat")];
-        if (settings[F("tubeLon")].is<float>())          tubeLon = settings[F("tubeLon")];
+        if (settings["hostname"].is<const char*>())   strlcpy(hostname, settings["hostname"], sizeof(hostname));
+        if (settings["wsdlHost"].is<const char*>())   strlcpy(wsdlHost, settings["wsdlHost"], sizeof(wsdlHost));
+        if (settings["wsdlAPI"].is<const char*>())    strlcpy(wsdlAPI, settings["wsdlAPI"], sizeof(wsdlAPI));
+        if (settings["showDate"].is<bool>())          dateEnabled = settings["showDate"];
+        if (settings["showBus"].is<bool>())           enableBus = settings["showBus"];
+        if (settings["showFullCalling"].is<bool>())   showFullCalling = settings["showFullCalling"];
+        if (settings["showFullMsgs"].is<bool>())      showFullMsgs = settings["showFullMsgs"];
+        if (settings["sleep"].is<bool>())             sleepEnabled = settings["sleep"];
+        if (settings["darkSleep"].is<bool>())         sleepClock = !settings["darkSleep"];
+        if (settings["fastRefresh"].is<bool>())       apiRefreshRate = settings["fastRefresh"] ? FASTDATAUPDATEINTERVAL : DATAUPDATEINTERVAL;
+        if (settings["weather"].is<bool>() && openWeatherMapApiKey.length())
+                                                    weatherEnabled = settings["weather"];
+        if (settings["update"].is<bool>())            firmwareUpdates = settings["update"];
+        if (settings["updateDaily"].is<bool>())       dailyUpdateCheck = settings["updateDaily"];
+        if (settings["sleepStarts"].is<int>())        sleepStarts = settings["sleepStarts"];
+        if (settings["sleepEnds"].is<int>())          sleepEnds = settings["sleepEnds"];
+        if (settings["brightness"].is<int>())         brightness = settings["brightness"];
 
-        // Clean up the underground station name
-        if (tubeName.endsWith(F(" Underground Station"))) tubeName.remove(tubeName.length()-20);
-        else if (tubeName.endsWith(F(" DLR Station"))) tubeName.remove(tubeName.length()-12);
-        else if (tubeName.endsWith(F(" (H&C Line)"))) tubeName.remove(tubeName.length()-11);
+        if (settings["noScroll"].is<bool>())          noScrolling = settings["noScroll"];
+        if (settings["flip"].is<bool>())              flipScreen = settings["flip"];
+        if (settings["touch"].is<bool>())             touchEnabled = settings["touch"];
+        if (settings["dataIcon"].is<bool>())          showDataIcon = settings["dataIcon"];
+        if (settings["forceWakeTime"].is<int>())      stayAwakeSeconds = settings["forceWakeTime"];
+        if (settings["TZ"].is<const char*>())         timezone = settings["TZ"].as<String>();
+        if (settings["nrTimeOffset"].is<int>())       nrTimeOffset = settings["nrTimeOffset"];
+        if (settings["hidePlatform"].is<bool>())      hidePlatform = settings["hidePlatform"];
+        if (settings["hideOrdinals"].is<bool>())      hideOrdinals = settings["hideOrdinals"];
+        if (settings["showLastSeen"].is<bool>())      showLastSeen = settings["showLastSeen"];
+        if (settings["showTubeLocation"].is<bool>())  showTubeCurrentLocation = settings["showTubeLocation"];
+        if (settings["showServiceMsgs"].is<bool>())   showServiceMsgs = settings["showServiceMsgs"];
 
-        if (settings[F("altCrs")].is<const char*>())     strlcpy(altCrsCode, settings[F("altCrs")], sizeof(altCrsCode));
-        if (altCrsCode[0]) altStationEnabled = true; else altStationEnabled = false;
-        if (settings[F("altStarts")].is<int>())          altStarts = settings[F("altStarts")];
-        if (settings[F("altEnds")].is<int>())            altEnds = settings[F("altEnds")];
-        if (settings[F("altLat")].is<float>())           altLat = settings[F("altLat")];
-        if (settings[F("altLon")].is<float>())           altLon = settings[F("altLon")];
-        if (settings[F("altCallingCrs")].is<const char*>()) strlcpy(altCallingCrsCode, settings[F("altCallingCrs")], sizeof(altCallingCrsCode));
-        if (settings[F("altCallingStation")].is<const char*>()) strlcpy(altCallingStation, settings[F("altCallingStation")], sizeof(altCallingStation));
-        if (settings[F("altPlatformFilter")].is<const char*>())  strlcpy(altPlatformFilter, settings[F("altPlatformFilter")], sizeof(altPlatformFilter));
+        if (settings["enableScheduler"].is<bool>())   enableScheduler = settings["enableScheduler"];
+        if (settings["enableCarousel"].is<bool>())    enableCarousel = settings["enableCarousel"];
 
-        if (settings[F("busId")].is<const char*>())      strlcpy(busAtco, settings[F("busId")], sizeof(busAtco));
-        if (settings[F("busName")].is<const char*>())    busName = String(settings[F("busName")]);
-        if (settings[F("busLat")].is<float>())           busLat = settings[F("busLat")];
-        if (settings[F("busLon")].is<float>())           busLon = settings[F("busLon")];
-        if (settings[F("busFilter")].is<const char*>())  strlcpy(busFilter, settings[F("busFilter")], sizeof(busFilter));
-
-        if (settings[F("noScroll")].is<bool>())          noScrolling = settings[F("noScroll")];
-        if (settings[F("flip")].is<bool>())              flipScreen = settings[F("flip")];
-        if (settings[F("touch")].is<bool>())             touchEnabled = settings[F("touch")];
-        if (settings[F("dataIcon")].is<bool>())          showDataIcon = settings[F("dataIcon")];
-        if (settings[F("forceWakeTime")].is<int>())      stayAwakeSeconds = settings[F("forceWakeTime")];
-        if (settings[F("TZ")].is<const char*>())         timezone = settings[F("TZ")].as<String>();
-        if (settings[F("nrTimeOffset")].is<int>())       nrTimeOffset = settings[F("nrTimeOffset")];
-        if (settings[F("hidePlatform")].is<bool>())      hidePlatform = settings[F("hidePlatform")];
-        if (settings[F("hideOrdinals")].is<bool>())      hideOrdinals = settings[F("hideOrdinals")];
-        if (settings[F("showLastSeen")].is<bool>())      showLastSeen = settings[F("showLastSeen")];
-
-        if (settings[F("rssUrl")].is<const char*>())     rssURL = String(settings[F("rssUrl")]);
-        if (settings[F("rssName")].is<const char*>())    rssName = String(settings[F("rssName")]);
+        if (settings["rssUrl"].is<const char*>())     rssURL = settings["rssUrl"].as<String>();
+        if (settings["rssName"].is<const char*>())    rssName = settings["rssName"].as<String>();
         if (rssURL != "") rssEnabled = true; else rssEnabled = false;
-        if (settings[F("rssPriority")].is<bool>())       rssPriority = settings[F("rssPriority")];
+        if (settings["rssPriority"].is<bool>())       rssPriority = settings["rssPriority"];
 
+        if (settings["dataSource"].is<int>())         useRDMclient = (settings["dataSource"]?1:0);
+        // validate the data source against which api keys are available
+        if (nrToken[0] && rdmDeparturesApiKey=="") useRDMclient = false;
+        else if (!nrToken[0] && rdmDeparturesApiKey!="") useRDMclient = true;
+
+        if (coldBoot) {
+          // Just load base parameters at boot, clock not set yet so exit
+          file.close();
+          return;
+        }
+
+        // Work out what board mode we're in
+        JsonArray scheduler = settings["scheduler"].as<JsonArray>();
+        JsonArray carousel = settings["carousel"].as<JsonArray>();
+
+        if (enableScheduler && !scheduler.isNull() && scheduler.size() > 0 && (requestedMode==MODE_LOADCONFIG || requestedMode==MODE_NEXTSCHEDULE)) {
+          if (requestedMode == MODE_LOADCONFIG) {
+            int currentMins = getTimeInMinutes();
+            int activeIndex = -1;
+
+            // Iterate through the sorted schedule to find the last entry that has already started
+            for (int i = 0; i < scheduler.size(); i++) {
+              const char* timeStr = scheduler[i]["time"];
+              if (timeStr) {
+                int h, m;
+                if (sscanf(timeStr, "%d:%d", &h, &m) == 2) {
+                  int entryMins = h * 60 + m;
+                  if (entryMins <= currentMins) {
+                    activeIndex = i;
+                  } else {
+                    // Since the array is chronologically sorted, the first entry strictly
+                    // greater than the current time implies we've passed the active one.
+                    break;
+                  }
+                }
+              }
+            }
+
+            // If activeIndex is still -1, it means the current time is before the first entry
+            // of the day. Because of midnight wrap-around, the active entry is the LAST entry
+            // from the previous day.
+            if (activeIndex == -1) {
+              activeIndex = scheduler.size() - 1;
+            }
+
+            // Save the active entry index (for touch)
+            currentScheduleSlot = activeIndex;
+            numScheduleSlots = scheduler.size();
+
+            // The next entry simply follows the active one, wrapping back to 0 at the end of the array
+            int nextIndex = (activeIndex + 1) % scheduler.size();
+
+            JsonObject currentSchedule = scheduler[activeIndex];
+            loadSlot(currentSchedule,false,requestedMode);
+            schedulerActive = true;
+
+            // Save the time of the active entry
+            const char* timeStrActive = scheduler[activeIndex]["time"];
+            if (timeStrActive) {
+              int h, m;
+              if (sscanf(timeStrActive, "%d:%d", &h, &m) == 2) {
+                activeSlotEventTime = h * 60 + m; // The time (in minutes) of the active event
+              }
+            }
+
+            // Save the time of the next entry (for the loop scheduler)
+            const char* timeStr = scheduler[nextIndex]["time"];
+            if (timeStr) {
+              int h, m;
+              if (sscanf(timeStr, "%d:%d", &h, &m) == 2) {
+                nextSlotEventTime = h * 60 + m; // The time (in minutes) of the next change
+              }
+            }
+          } else {
+            // Push on to the next schedule slot via touch
+            currentScheduleSlot = (currentScheduleSlot + 1) % numScheduleSlots;
+            JsonObject currentSchedule = scheduler[currentScheduleSlot];
+            loadSlot(currentSchedule,false,requestedMode);
+            schedulerActive = true;
+          }
+        } else if (enableCarousel && !carousel.isNull() && carousel.size() > 0 && requestedMode == MODE_LOADCONFIG) {
+          numCarouselSlots = carousel.size();
+          if (currentCarouselSlot >= numCarouselSlots) currentCarouselSlot = 0;
+          JsonObject currentCarousel = carousel[currentCarouselSlot];
+          loadSlot(currentCarousel,false,requestedMode);
+          carouselActive = true;
+
+          // Work out when the next change occurs
+          activeSlotEventTime = getTimeInMinutes();
+          if (currentCarousel["duration"].is<int>()) nextSlotEventTime = currentCarousel["duration"];
+          nextSlotEventTime = (activeSlotEventTime + nextSlotEventTime) % 1440;
+
+        } else {
+          // Plain board mode as defined by the user
+          loadSlot(settings,true,requestedMode);
+        }
       } else {
         // JSON deserialization failed - TODO
       }
@@ -1135,21 +1304,6 @@ void loadConfig() {
   } else if (apiKeys) writeDefaultConfig();
 }
 
-// Switch to the alternate station settings if appropriate
-bool setAlternateStation(bool force) {
-  if ((boardMode==MODE_RAIL && altStationEnabled && isAltActive()) || force) {
-    // Switch to alternate station
-    strcpy(crsCode,altCrsCode);
-    stationLat = altLat;
-    stationLon = altLon;
-    strcpy(callingCrsCode, altCallingCrsCode);
-    strcpy(callingStation, altCallingStation);
-    strcpy(platformFilter, altPlatformFilter);
-    return true;
-  } else {
-    return false;
-  }
-}
 void buildRssMessage() {
   if (rss.numRssTitles>0) {
     sprintf(rssMessage,"%s: %s",rssName.c_str(),rss.rssTitle[0]);
@@ -1178,40 +1332,28 @@ void updateRssFeed() {
 void updateCurrentWeather(float latitude, float longitude) {
   nextWeatherUpdate = millis() + WEATHERUPDATEINTERVAL;
   if (!latitude || !longitude) return; // No location co-ordinates
-  strcpy(weatherMsg,"");
+  weatherMsg[0]='\0';
   lastWeatherUpdateResult = currentWeather.updateWeather(openWeatherMapApiKey, String(latitude), String(longitude));
-  if (lastWeatherUpdateResult == UPD_SUCCESS) {
-    currentWeather.currentWeather.toCharArray(weatherMsg,sizeof(weatherMsg));
-    weatherMsg[0] = toUpperCase(weatherMsg[0]);
-    weatherMsg[sizeof(weatherMsg)-1] = '\0';
-  }
+  if (lastWeatherUpdateResult == UPD_SUCCESS) strlcpy(weatherMsg,currentWeather.currentWeatherMessage,MAXWEATHERSIZE);
 }
 
 void checkWeatherUpdate(float prevLat, float prevLon) {
-  if (boardMode == MODE_TUBE) {
-    stationLat = tubeLat;
-    stationLon = tubeLon;
-  } else if (boardMode == MODE_BUS) {
-    stationLat = busLat;
-    stationLon = busLon;
-  }
-  if (weatherEnabled && (prevLat!=stationLat || prevLon!=stationLon)) {
+  if (weatherEnabled && (prevLat!=locationLat || prevLon!=locationLon)) {
     prevProgressBarPosition = 114;
-    progressBar(F("Getting weather conditions"),60);
-    updateCurrentWeather(stationLat,stationLon);
+    progressBar("Getting weather conditions",60);
+    updateCurrentWeather(locationLat,locationLon);
   }
 }
 
-// Soft reset/reload
-void softResetBoard(boardModes forcedMode, bool switchAlt) {
+// Soft reset/reload the board.
+void softResetBoard(boardModes requestedMode) {
   boardModes previousMode = boardMode;
   String prevRssUrl = rssURL;
-  float prevLat = stationLat;
-  float prevLon = stationLon;
+  float prevLat = locationLat;
+  float prevLon = locationLon;
 
   // Reload the settings
-  loadConfig();
-  if (forcedMode!=MODE_LOADCONFIG) boardMode = forcedMode;
+  loadConfig(false,requestedMode);
   if (flipScreen) u8g2.setFlipMode(1); else u8g2.setFlipMode(0);
   if (timezone!="") {
     setenv("TZ",timezone.c_str(),1);
@@ -1221,8 +1363,7 @@ void softResetBoard(boardModes forcedMode, bool switchAlt) {
   tzset();
   u8g2.clearBuffer();
   drawStartupHeading();
-  if (switchAlt) centreText(F("Switching stations..."),53);
-  else if (forcedMode!=MODE_LOADCONFIG) centreText(F("Switching modes..."),53);
+  if (requestedMode==MODE_NEXTMODE) centreText("Switching modes...",53);
   u8g2.updateDisplay();
 
   // Force an update asap
@@ -1233,6 +1374,7 @@ void softResetBoard(boardModes forcedMode, bool switchAlt) {
   isScrollingStops = false;
   isScrollingPrimary = false;
   isSleeping=false;
+  forcedSleep=false;
   firstLoad=true;
   noDataLoaded=true;
   viaTimer=0;
@@ -1246,60 +1388,14 @@ void softResetBoard(boardModes forcedMode, bool switchAlt) {
   line3Service=0;
   prevService=0;
   fetchComplete=false;
-  if (!weatherEnabled) strcpy(weatherMsg,"");
-  if (previousMode!=boardMode) {
-    // Board mode has changed!
-    switch (previousMode) {
-      case MODE_RAIL:
-        // Delete the NR client from memory
-        delete raildata;
-        raildata = nullptr;
-        break;
-
-      case MODE_TUBE:
-        // Delete the tfl client from memory
-        delete tfldata;
-        tfldata = nullptr;
-        break;
-
-      case MODE_BUS:
-        // Delete the Bus client from memory
-        delete busdata;
-        busdata = nullptr;
-        break;
-    }
-
-    switch (boardMode) {
-      case MODE_RAIL:
-        // Create the NR client
-        raildata = new raildataXmlClient();
-        if (boardMode == MODE_RAIL) {
-          int res = raildata->init(wsdlHost, wsdlAPI);
-          if (res != UPD_SUCCESS) {
-            showWsdlFailureScreen();
-             while (true) { delay(1);}
-          }
-        }
-        break;
-
-      case MODE_TUBE:
-        // Create the TfL client
-        tfldata = new TfLdataClient();
-        break;
-
-      case MODE_BUS:
-        // Create the Bus client
-        busdata = new busDataClient();
-        break;
-    }
-
-  }
+  nextSchedulerCheck=millis()+10000;
+  if (!weatherEnabled) weatherMsg[0]='\0';
 
   if (rssEnabled && prevRssUrl != rssURL) {
     rssMessage[0] = '\0';
     if (boardMode == MODE_RAIL || boardMode == MODE_TUBE) {
       prevProgressBarPosition=95;
-      progressBar(F("Updating RSS headlines feed"),50);
+      progressBar("Updating RSS headlines feed",50);
       updateRssFeed();
     }
   } else if (rssEnabled && previousMode!=boardMode && boardMode!=MODE_BUS) {
@@ -1308,59 +1404,52 @@ void softResetBoard(boardModes forcedMode, bool switchAlt) {
 
   switch (boardMode) {
     case MODE_RAIL:
-      if (switchAlt) {
-        touchOverrideAlt = true;
-        if (!altStationActive) {
-          altStationActive = setAlternateStation(true);
-        } else altStationActive = false;
-      } else {
-        touchOverrideAlt = false;
-        altStationActive = setAlternateStation(false);
-      }
       checkWeatherUpdate(prevLat,prevLon);
       // Create a cleaned platform filter (if any)
-      raildata->cleanFilter(platformFilter,cleanPlatformFilter,sizeof(platformFilter));
-      progressBar(F("Initialising National Rail interface"),70);
+      rdmRailData.cleanFilter(locationFilter,locationCleanFilter,sizeof(locationFilter));
+      progressBar("Initialising National Rail interface",70);
+      if (!useRDMclient) {
+        // Using legacy XML client
+        int res = darwinRailData.init(wsdlHost, wsdlAPI);
+        if (res != UPD_SUCCESS) {
+          showWsdlFailureScreen();
+          while (true) { delay(1);}
+        }
+      }
       break;
 
     case MODE_TUBE:
       checkWeatherUpdate(prevLat,prevLon);
-      progressBar(F("Initialising TfL interface"),70);
+      progressBar("Initialising TfL interface",70);
       break;
 
     case MODE_BUS:
       checkWeatherUpdate(prevLat,prevLon);
-      progressBar(F("Initialising BusTimes interface"),70);
+      progressBar("Initialising BusTimes interface",70);
       // Create a cleaned filter
-      busdata->cleanFilter(busFilter,cleanBusFilter,sizeof(busFilter));
+      busdata.cleanFilter(locationFilter,locationCleanFilter,sizeof(locationFilter));
       break;
   }
   station.numServices=0;
   messages.numMessages=0;
 }
 
-// Handle switching to next board mode (touch sensor)
+// Handle switching to next board mode or carousel/scheduler slot (touch sensor)
 void switchToNextMode() {
+  if ((carouselActive && numCarouselSlots<2) || (schedulerActive && numScheduleSlots<2)) return;  // Nothing to switch to
 
   if (fetchInProgress) {
     // Wait for the background fetch to finish before we soft reset
-    showSwitchScreen(true);
+    showSwitchScreen();
     while (fetchInProgress) delay(50);
   }
-  switch (boardMode) {
-    case MODE_RAIL:
-      if (tubeId[0]) softResetBoard(MODE_TUBE,false);
-      else if (busAtco[0]) softResetBoard(MODE_BUS,false);
-      break;
-    case MODE_TUBE:
-      if (busAtco[0]) softResetBoard(MODE_BUS,false);
-      else if (crsCode[0]) softResetBoard(MODE_RAIL,false);
-      break;
-    case MODE_BUS:
-      if (crsCode[0]) softResetBoard(MODE_RAIL,false);
-      else if (tubeId[0]) softResetBoard(MODE_TUBE,false);
-      break;
+
+  if (carouselActive) {
+    currentCarouselSlot = (currentCarouselSlot + 1) % numCarouselSlots;
+    softResetBoard(MODE_LOADCONFIG);
   }
+  else if (schedulerActive) softResetBoard(MODE_NEXTSCHEDULE);
+  else if (railIsSet+tubeIsSet+busIsSet > 1) softResetBoard(MODE_NEXTMODE); // Check there's at least two configured modes
 }
 
 // WiFiManager callback, entered config mode
@@ -1392,18 +1481,8 @@ bool checkForFirmwareUpdate() {
 
   if (!isFirmwareUpdateAvailable()) return result;
 
-  // Find the firmware binary in the release assets
-  String updatePath="";
-  for (int i=0;i<ghUpdate.releaseAssets;i++){
-    if (ghUpdate.releaseAssetName[i] == "firmware.bin") {
-      updatePath = ghUpdate.releaseAssetURL[i];
-      break;
-    }
-  }
-  if (updatePath.length()==0) {
-    //  No firmware binary in release assets
-    return result;
-  }
+  // Check that we found the firmware.bin file in the release assets
+  if (ghUpdate.firmwareURL.length()==0) return result;
 
   for (int i=30;i>=0;i--) {
     showFirmwareUpdateWarningScreen(ghUpdate.releaseDescription.c_str(),i);
@@ -1417,7 +1496,7 @@ bool checkForFirmwareUpdate() {
   httpUpdate.onProgress(update_progress);
   httpUpdate.rebootOnUpdate(false); // Don't auto reboot, we'll handle it
 
-  HTTPUpdateResult ret = httpUpdate.handleUpdate(client, updatePath, ghUpdate.accessToken);
+  HTTPUpdateResult ret = httpUpdate.handleUpdate(client, ghUpdate.firmwareURL);
   const char* msgTitle = "Firmware Update";
   switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -1552,7 +1631,7 @@ void drawServiceLine(int line, int y) {
       centreText(weatherMsg,y-1);
     } else {
       // We're showing the mandatory attribution
-      centreText(nrAttributionn,y-1);
+      centreText(useRDMclient?rdgAttribution:nrAttributionn,y-1);
     }
   }
 }
@@ -1570,7 +1649,7 @@ void drawStationBoard() {
     // Clear the top two lines
     blankArea(0,LINE0,256,LINE2-1);
   }
-  drawStationHeader(station.location,callingStation,platformFilter,nrTimeOffset);
+  drawStationHeader(station.location,callingStation,locationFilter,nrTimeOffset);
 
   // Draw the primary service line
   isShowingVia=false;
@@ -1650,46 +1729,44 @@ void drawStationBoard() {
         numMessages++;
       }
     }
-    // Check if RSS should be inserted before nrcc messages
-    if (rssEnabled && rssPriority && rssMessage[0]) {
-      strcpy(line2[numMessages++],rssMessage);
-    }
 
-    // Add any nrcc messages
-    for (int i=0;i<messages.numMessages;i++) {
-      strcpy(line2[numMessages],messages.messages[i]);
-      numMessages++;
-    }
-
-    // Check if RSS should be added after nrcc messages
-    if (rssEnabled && !rssPriority && rssMessage[0]) {
-      strcpy(line2[numMessages++],rssMessage);
-    }
-
-    // Setup for the first message to rollover to
-    isScrollingStops=false;
-    currentMessage=numMessages-1;
     if (noScrolling && station.numServices>1) {
       drawServiceLine(1,LINE2);
     }
   } else {
     blankArea(0,LINE2,256,LINE4-LINE2);
     u8g2.setFont(NatRailTall12);
-    centreText(F("There are no scheduled services at this station."),LINE1-1);
+    centreText("There are no scheduled services at this station.",LINE1-1);
     numMessages = messages.numMessages;
-    for (int i=0;i<messages.numMessages;i++) {
-      strcpy(line2[i],messages.messages[i]);
-    }
-    // Setup for the first message to rollover to
-    isScrollingStops=false;
-    currentMessage=numMessages-1;
   }
+
+  // Check if RSS should be inserted before nrcc messages
+  if (rssEnabled && rssPriority && rssMessage[0]) {
+    strcpy(line2[numMessages++],rssMessage);
+  }
+
+  // Add any nrcc messages
+  for (int i=0;i<messages.numMessages;i++) {
+    strcpy(line2[numMessages],messages.messages[i]);
+    numMessages++;
+  }
+
+  // Check if RSS should be added after nrcc messages
+  if (rssEnabled && !rssPriority && rssMessage[0]) {
+    strcpy(line2[numMessages++],rssMessage);
+  }
+
+  // Setup for the first message to rollover to
+  isScrollingStops=false;
+  currentMessage=numMessages-1;
+
   u8g2.setFont(NatRailSmall9);
   u8g2.sendBuffer();
 }
 
 void updateRailDepartures() {
-  raildata->loadDepartures(&station,&messages);
+  if (useRDMclient) rdmRailData.loadDepartures(&station,&messages);
+  else darwinRailData.loadDepartures(&station,&messages);
   lastDataLoadTime = millis();
   noDataLoaded = false;
   dataLoadSuccess++;
@@ -1714,53 +1791,63 @@ void waitForFirstLoad() {
  */
 
 // Draw the TfL clock (if the time has changed)
-void drawCurrentTimeUG(bool update) {
-  char sysTime[29];
-  getLocalTime(&timeinfo);
-
-  sprintf(sysTime,"%02d:%02d:%02d",timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec);
-  if (strcmp(displayedTime,sysTime)) {
+bool drawCurrentTimeUG() {
+  if (strcmp(displayedTime,currentTime)) {
     u8g2.setFont(UndergroundClock8);
     blankArea(99,ULINE4,58,8);
-    u8g2.drawStr(99,ULINE4-1,sysTime);
-    if (update) u8g2.updateDisplayArea(12,7,8,1);
-    strcpy(displayedTime,sysTime);
+    u8g2.drawStr(99,ULINE4-1,currentTime);
+    u8g2.updateDisplayArea(12,7,8,1);
+    strcpy(displayedTime,currentTime);
     u8g2.setFont(Underground10);
 
     if (dateEnabled && timeinfo.tm_mday!=dateDay) {
-      if (boardMode == MODE_TUBE) drawStationHeader(tubeName.c_str(),"","",0);
-      else drawStationHeader(busName.c_str(),"",busFilter,0);
-      if (update) u8g2.sendBuffer();  // Just refresh on new date
+      if (boardMode == MODE_TUBE) drawStationHeader(locationName,"","",0);
+      else drawStationHeader(locationName,"",locationFilter,0);
+      u8g2.sendBuffer();  // Just refresh on new date
       u8g2.setFont(Underground10);
     }
+    return true;
+  } else {
+    return false;
   }
 }
 
 void updateArrivals() {
-  tfldata->loadArrivals(&station,&messages);
+  tfldata.loadArrivals(&station,&messages);
   lastDataLoadTime = millis();
   noDataLoaded = false;
   dataLoadSuccess++;
 }
 
-void drawUndergroundService(int serviceId, int y) {
-  char serviceData[8+MAXLINESIZE+MAXLOCATIONSIZE];
+void drawUndergroundService(int serviceId, int y, bool isShowingCurrentLocation = false) {
+  char serviceData[4+MAXLOCATIONSIZE];
+  int usedSpace = 4;
 
   u8g2.setFont(Underground10);
   blankArea(0,y,256,10);
 
   if (serviceId < station.numServices) {
-    sprintf(serviceData,"%d %s",serviceId+1,station.service[serviceId].destination);
-    u8g2.drawStr(0,y-1,serviceData);
-    if (serviceId || station.service[serviceId].timeToStation > 10) {
-      if (station.service[serviceId].timeToStation <= 40) u8g2.drawStr(SCREEN_WIDTH-19,y-1,"Due");
-      else {
+    if (serviceId || (strcmp(station.origin,"At Platform") && station.service[0].timeToStation>10)) {
+      if (station.service[serviceId].timeToStation <= 40) {
+        usedSpace += u8g2.drawStr(SCREEN_WIDTH-19,y-1,"Due");
+      } else {
         int mins = (station.service[serviceId].timeToStation + 30) / 60; // Round to nearest minute
         sprintf(serviceData,"%d",mins);
         if (mins==1) u8g2.drawStr(SCREEN_WIDTH-22,y-1,"min"); else u8g2.drawStr(SCREEN_WIDTH-22,y-1,"mins");
-        u8g2.drawStr(SCREEN_WIDTH-27-(strlen(serviceData)*7),y-1,serviceData);
+        usedSpace += u8g2.drawStr(SCREEN_WIDTH-27-(strlen(serviceData)*7),y-1,serviceData) + 22;
       }
     }
+
+    if (isShowingCurrentLocation) sprintf(serviceData,"%d %s",serviceId+1,station.origin);
+    else sprintf(serviceData,"%d %s",serviceId+1,station.service[serviceId].destination);
+    if (getStringWidth(serviceData) > SCREEN_WIDTH-usedSpace) {
+      while (getStringWidth(serviceData) > SCREEN_WIDTH-usedSpace-6) {
+        serviceData[strlen(serviceData)-1] = '\0';
+      }
+      if (serviceData[strlen(serviceData)-1] == ' ') serviceData[strlen(serviceData)-1] = '\0'; // remove any trailing space
+      strcat(serviceData,"\x81");
+    }
+    u8g2.drawStr(0,y-1,serviceData);
   }
 }
 
@@ -1777,9 +1864,11 @@ void drawUndergroundBoard() {
       // Clear the top three lines
       blankArea(0,ULINE0,256,ULINE3-1);
   }
-  drawStationHeader(tubeName.c_str(),"","",0);
+  drawStationHeader(locationName,"","",0);
 
   if (station.boardChanged) {
+    isShowingVia = false;
+    if (station.origin[0]) viaTimer=millis()+6000; else viaTimer=millis()+300000;
     // prepare to scroll up primary services
     scrollPrimaryYpos = 11;
     isScrollingPrimary = true;
@@ -1796,7 +1885,7 @@ void drawUndergroundBoard() {
       if (station.numServices>1) drawUndergroundService(1,ULINE2);
     } else {
       u8g2.setFont(Underground10);
-      centreText(F("There are no scheduled arrivals at this station."),ULINE1-1);
+      centreText("There are no scheduled arrivals at this station.",ULINE1-1);
     }
   }
 
@@ -1878,7 +1967,7 @@ void drawBusDeparturesBoard() {
       // Clear the top three lines
       blankArea(0,ULINE0,256,ULINE3-1);
   }
-  drawStationHeader(busName.c_str(),"",busFilter,0);
+  drawStationHeader(locationName,"",locationFilter,0);
 
   if (station.boardChanged) {
     // prepare to scroll up primary services
@@ -1900,14 +1989,14 @@ void drawBusDeparturesBoard() {
       if (station.numServices>1) drawBusService(1,ULINE2,busDestX);
     } else {
       u8g2.setFont(NatRailSmall9);
-      centreText(F("There are no scheduled services at this stop."),ULINE1-1);
+      centreText("There are no scheduled services at this stop.",ULINE1-1);
     }
   }
   u8g2.sendBuffer();
 }
 
 void updateBusDepartures() {
-  busdata->loadDepartures(&station);
+  busdata.loadDepartures(&station);
   lastDataLoadTime = millis();
   noDataLoaded = false;
   dataLoadSuccess++;
@@ -1934,48 +2023,44 @@ void updateBusDepartures() {
  */
 
 // Helper function for returning text status messages
-void sendResponse(int code, const __FlashStringHelper* msg, AsyncWebServerRequest *request) {
-  request->send(code,contentTypeText,msg);
-}
-
 void sendResponse(int code, String msg, AsyncWebServerRequest *request) {
   request->send(code,contentTypeText,msg);
 }
 
 // Return the correct MIME type for a file name
 String getContentType(String filename) {
-  if (filename.endsWith(F(".htm"))) {
-    return F("text/html");
-  } else if (filename.endsWith(F(".html"))) {
-    return F("text/html");
-  } else if (filename.endsWith(F(".css"))) {
-    return F("text/css");
-  } else if (filename.endsWith(F(".js"))) {
-    return F("application/javascript");
-  } else if (filename.endsWith(F(".png"))) {
-    return F("image/png");
-  } else if (filename.endsWith(F(".gif"))) {
-    return F("image/gif");
-  } else if (filename.endsWith(F(".jpg"))) {
-    return F("image/jpeg");
-  } else if (filename.endsWith(F(".ico"))) {
-    return F("image/x-icon");
-  } else if (filename.endsWith(F(".xml"))) {
-    return F("text/xml");
-  } else if (filename.endsWith(F(".pdf"))) {
-    return F("application/x-pdf");
-  } else if (filename.endsWith(F(".zip"))) {
-    return F("application/x-zip");
-  } else if (filename.endsWith(F(".json"))) {
-    return F("application/json");
-  } else if (filename.endsWith(F(".gz"))) {
-    return F("application/x-gzip");
-  } else if (filename.endsWith(F(".svg"))) {
-    return F("image/svg+xml");
-  } else if (filename.endsWith(F(".webp"))) {
-    return F("image/webp");
+  if (filename.endsWith(".htm")) {
+    return "text/html";
+  } else if (filename.endsWith(".html")) {
+    return "text/html";
+  } else if (filename.endsWith(".css")) {
+    return "text/css";
+  } else if (filename.endsWith(".js")) {
+    return "application/javascript";
+  } else if (filename.endsWith(".png")) {
+    return "image/png";
+  } else if (filename.endsWith(".gif")) {
+    return "image/gif";
+  } else if (filename.endsWith(".jpg")) {
+    return "image/jpeg";
+  } else if (filename.endsWith(".ico")) {
+    return "image/x-icon";
+  } else if (filename.endsWith(".xml")) {
+    return "text/xml";
+  } else if (filename.endsWith(".pdf")) {
+    return "application/x-pdf";
+  } else if (filename.endsWith(".zip")) {
+    return "application/x-zip";
+  } else if (filename.endsWith(".json")) {
+    return "application/json";
+  } else if (filename.endsWith(".gz")) {
+    return "application/x-gzip";
+  } else if (filename.endsWith(".svg")) {
+    return "image/svg+xml";
+  } else if (filename.endsWith(".webp")) {
+    return "image/webp";
   }
-  return F("text/plain");
+  return "text/plain";
 }
 
 // Stream a file from the file system
@@ -1987,10 +2072,19 @@ bool handleStreamFile(String filename, AsyncWebServerRequest *request) {
   } else return false;
 }
 
-// Stream a file stored in PROGMEM flash (default graphics are now included in the firmware image)
+// Stream a file stored in flash (default graphics are now included in the firmware image)
 void handleStreamFlashFile(String filename, const uint8_t *filedata, size_t contentLength, AsyncWebServerRequest *request) {
   String contentType = getContentType(filename);
-  request->send(200,contentType,(uint8_t *)filedata, contentLength);
+  AsyncWebServerResponse *response = request->beginResponse(200, contentType, filedata, contentLength);
+  response->addHeader("Cache-Control", "public,max-age=3600,s-maxage=3600");
+  request->send(response);
+}
+
+void handleStreamGzipFlashFile(String filename, const uint8_t *filedata, size_t contentLength, AsyncWebServerRequest *request) {
+  String contentType = getContentType(filename);
+  AsyncWebServerResponse *response = request->beginResponse(200, contentType, filedata, contentLength);
+  response->addHeader("Content-Encoding", "gzip");
+  request->send(response);
 }
 
 /*
@@ -2011,27 +2105,27 @@ void handleFileList(AsyncWebServerRequest *request) {
   if (!request->hasParam("dir")) path="/"; else path = request->getParam("dir")->value();
   File root = LittleFS.open(path);
 
-  String output=F("<html><body style=\"font-family:Helvetica,Arial,sans-serif\"><h2>Departures Board File System</h2>");
+  String output="<html><body style=\"font-family:Helvetica,Arial,sans-serif\"><h2>Departures Board File System</h2>";
   if (!root) {
-    output+=F("<p>Failed to open directory</p>");
+    output+="<p>Failed to open directory</p>";
   } else if (!root.isDirectory()) {
-    output+=F("<p>Not a directory</p>");
+    output+="<p>Not a directory</p>";
   } else {
-    output+=F("<table>");
+    output+="<table>";
     File file = root.openNextFile();
     while (file) {
-      output+=F("<tr><td>");
+      output+="<tr><td>";
       if (file.isDirectory()) {
-        output+="[DIR]</td><td><a href=\"/rmdir?f=" + String(file.path()) + F("\" title=\"Delete\">X</a></td><td><a href=\"/dir?dir=") + String(file.path()) + F("\">") + String(file.name()) + F("</a></td></tr>");
+        output+="[DIR]</td><td><a href=\"/rmdir?f=" + String(file.path()) + "\" title=\"Delete\">X</a></td><td><a href=\"/dir?dir=" + String(file.path()) + "\">" + String(file.name()) + "</a></td></tr>";
       } else {
-        output+=String(file.size()) + F("</td><td><a href=\"/del?f=")+ String(file.path()) + F("\" title=\"Delete\">X</a></td><td><a href=\"/cat?f=") + String(file.path()) + F("\">") + String(file.name()) + F("</a></td></tr>");
+        output+=String(file.size()) + "</td><td><a href=\"/del?f="+ String(file.path()) + "\" title=\"Delete\">X</a></td><td><a href=\"/cat?f=" + String(file.path()) + "\">" + String(file.name()) + "</a></td></tr>";
       }
       file = root.openNextFile();
     }
   }
 
-  output += F("</table><br>");
-  output += getFSInfo() + F("<p><a href=\"/upload\">Upload</a> a file</p></body></html>");
+  output += "</table><br>";
+  output += getFSInfo() + "<p><a href=\"/upload\">Upload</a> a file</p></body></html>";
   request->send(200,contentTypeHtml,output);
 }
 
@@ -2040,7 +2134,7 @@ void handleCat(AsyncWebServerRequest *request) {
   if (request->hasParam("f")) {
     String filename = request->getParam("f")->value();
     handleStreamFile(filename,request);
-  } else sendResponse(404,F("Not found"),request);
+  } else sendResponse(404,"Not found",request);
 }
 
 // Delete a file from the file system
@@ -2050,8 +2144,8 @@ void handleDelete(AsyncWebServerRequest *request) {
     if (LittleFS.remove(filename)) {
       // Successfully removed go back to directory listing
       request->redirect("/dir");
-    } else sendResponse(400,F("Failed to delete file"),request);
-  } else sendResponse(404,F("Not found"),request);
+    } else sendResponse(400,"Failed to delete file",request);
+  } else sendResponse(404,"Not found",request);
 }
 
 // Format the file system
@@ -2059,9 +2153,9 @@ void handleFormatFFS(AsyncWebServerRequest *request) {
   String message;
 
   if (LittleFS.format()) {
-    message=F("File System was successfully formatted\n\n");
+    message="File System was successfully formatted\n\n";
     message+=getFSInfo();
-  } else message=F("File System could not be formatted!");
+  } else message="File System could not be formatted!";
   sendResponse(200,message,request);
 }
 
@@ -2072,50 +2166,54 @@ void handleFormatFFS(AsyncWebServerRequest *request) {
 // Fallback function for browser requests
 void handleNotFound(AsyncWebServerRequest *request) {
   if ((LittleFS.exists(request->url())) && (request->method() == HTTP_GET)) handleStreamFile(request->url(),request);
-  else if (request->url() == F("/keys.htm")) handleStreamFlashFile(request->url(), keyshtm, sizeof(keyshtm),request);
-  else if (request->url() == F("/index.htm")) handleStreamFlashFile(request->url(), indexhtm, sizeof(indexhtm),request);
-  else if (request->url() == F("/editrss.htm")) handleStreamFlashFile(request->url(), editrsshtm, sizeof(editrsshtm),request);
-  else if (request->url() == F("/nrelogo.webp")) handleStreamFlashFile(request->url(), nrelogo, sizeof(nrelogo),request);
-  else if (request->url() == F("/tfllogo.webp")) handleStreamFlashFile(request->url(), tfllogo, sizeof(tfllogo),request);
-  else if (request->url() == F("/btlogo.webp")) handleStreamFlashFile(request->url(), btlogo, sizeof(btlogo),request);
-  else if (request->url() == F("/tube.webp")) handleStreamFlashFile(request->url(), tubeicon, sizeof(tubeicon),request);
-  else if (request->url() == F("/nr.webp")) handleStreamFlashFile(request->url(), nricon, sizeof(nricon),request);
-  else if (request->url() == F("/favicon.png")) handleStreamFlashFile(request->url(), faviconpng, sizeof(faviconpng),request);
-  else if (request->url() == F("/rss.json")) handleStreamFlashFile(request->url(), rssjson, sizeof(rssjson),request);
-  else sendResponse(404,F("Not Found"),request);
+  else if (request->url() == "/keys.htm") handleStreamGzipFlashFile(request->url(), keyshtm, sizeof(keyshtm),request);
+  else if (request->url() == "/index.htm") handleStreamGzipFlashFile(request->url(), indexhtm, sizeof(indexhtm),request);
+  else if (request->url() == "/editrss.htm") handleStreamGzipFlashFile(request->url(), editrsshtm, sizeof(editrsshtm),request);
+  else if (request->url() == "/nrelogo.webp") handleStreamFlashFile(request->url(), nrelogo, sizeof(nrelogo),request);
+  else if (request->url() == "/rdglogo.webp") handleStreamFlashFile(request->url(), rdglogo, sizeof(nrelogo),request);
+  else if (request->url() == "/tfllogo.webp") handleStreamFlashFile(request->url(), tfllogo, sizeof(tfllogo),request);
+  else if (request->url() == "/btlogo.webp") handleStreamFlashFile(request->url(), btlogo, sizeof(btlogo),request);
+  else if (request->url() == "/tube.webp") handleStreamFlashFile(request->url(), tubeicon, sizeof(tubeicon),request);
+  else if (request->url() == "/nr.webp") handleStreamFlashFile(request->url(), nricon, sizeof(nricon),request);
+  else if (request->url() == "/ibus.webp") handleStreamFlashFile(request->url(), ibus, sizeof(ibus),request);
+  else if (request->url() == "/irail.webp") handleStreamFlashFile(request->url(), irail, sizeof(irail),request);
+  else if (request->url() == "/itube.webp") handleStreamFlashFile(request->url(), itube, sizeof(itube),request);
+  else if (request->url() == "/favicon.png") handleStreamFlashFile(request->url(), faviconpng, sizeof(faviconpng),request);
+  else if (request->url() == "/rss.json") handleStreamGzipFlashFile(request->url(), rssjson, sizeof(rssjson),request);
+  else sendResponse(404,"Not Found",request);
 }
 
 String getResultCodeText(int resultCode) {
   switch (resultCode) {
     case UPD_SUCCESS:
-      return F("SUCCESS");
+      return "SUCCESS";
       break;
     case UPD_NO_CHANGE:
-      return F("SUCCESS (NO CHANGES)");
+      return "SUCCESS (NO CHANGES)";
       break;
     case UPD_SEC_CHANGE:
-      return F("SUCCESS (SECONDARY CHANGES)");
+      return "SUCCESS (SECONDARY CHANGES)";
       break;
     case UPD_DATA_ERROR:
-      return F("DATA ERROR");
+      return "DATA ERROR";
       break;
     case UPD_UNAUTHORISED:
-      return F("UNAUTHORISED");
+      return "UNAUTHORISED";
       break;
     case UPD_HTTP_ERROR:
-      return F("HTTP ERROR");
+      return "HTTP ERROR";
       break;
     case UPD_INCOMPLETE:
-      return F("INCOMPLETE DATA RECEIVED");
+      return "INCOMPLETE DATA RECEIVED";
       break;
     case UPD_NO_RESPONSE:
-      return F("NO RESPONSE FROM SERVER");
+      return "NO RESPONSE FROM SERVER";
       break;
     case UPD_TIMEOUT:
-      return F("TIMEOUT WAITING FOR SERVER");
+      return "TIMEOUT WAITING FOR SERVER";
       break;
     default:
-      return F("OTHER ERROR");
+      return "OTHER ERROR";
       break;
   }
 }
@@ -2130,42 +2228,48 @@ void handleInfo(AsyncWebServerRequest *request) {
 
   sprintf(sysUptime,"%d days, %d hrs, %d min", days,hours,minutes);
 
-  String message = "Hostname: " + String(hostname) + F("\nFirmware version: v") + String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + " " + getBuildTime() + F("\nSystem uptime: ") + String(sysUptime) + F("\nFree Heap: ") + String(ESP.getFreeHeap()) + F("\nFree LittleFS space: ") + String(LittleFS.totalBytes() - LittleFS.usedBytes());
-  message+="\nCore Plaform: " + String(ESP.getCoreVersion()) + F("\nCPU speed: ") + String(ESP.getCpuFreqMHz()) + F("MHz\nCPU Temperature: ") + String(temperatureRead()) + F("\nWiFi network: ") + String(WiFi.SSID()) + F("\nWiFi signal strength: ") + String(WiFi.RSSI()) + F("dB");
-  getLocalTime(&timeinfo);
+  String message = "Free Heap: " + String(ESP.getFreeHeap()) + "\nMin Heap: " + String(ESP.getMinFreeHeap()) + "\nLargest free block: " + String(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)) + "\nHostname: " + String(hostname) + "\nFirmware version: v" + String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + " " + getBuildTime() + "\nSystem uptime: " + String(sysUptime) + "\nFree LittleFS space: " + String(LittleFS.totalBytes() - LittleFS.usedBytes());
+  message+="\nCore Plaform: " + String(ESP.getCoreVersion()) + "\nCPU speed: " + String(ESP.getCpuFreqMHz()) + "MHz\nCPU Temperature: " + String(temperatureRead()) + "\nWiFi network: " + String(WiFi.SSID()) + "\nWiFi signal strength: " + String(WiFi.RSSI()) + "dB";
 
   sprintf(sysUptime,"%02d:%02d:%02d %02d/%02d/%04d",timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec,timeinfo.tm_mday,timeinfo.tm_mon+1,timeinfo.tm_year+1900);
   message+="\nSystem clock: " + String(sysUptime);
-  message+="\nCRS station code: " + String(crsCode) + F("\nNaptan station code: ") + String(tubeId) + F("\nSuccessful: ") + String(dataLoadSuccess) + F("\nFailures: ") + String(dataLoadFailure) + F("\nTime since last data load: ") + String((int)((millis()-lastDataLoadTime)/1000)) + F(" seconds");
-  if (dataLoadFailure) message+="\nTime since last failure: " + String((int)((millis()-lastLoadFailure)/1000)) + F(" seconds");
-  message+=F("\nLast Result: ");
+  if (ghUpdate.releaseId.length()) {
+    message+="\nGithub: " + ghUpdate.releaseId + " " + ghUpdate.firmwareURL;
+  }
+
+  if (schedulerActive) message+="\nScheduler active, next event at " + String(nextSlotEventTime);
+  else if (carouselActive) message+="\nCarousel active, next event at " + String(nextSlotEventTime);
+
+  message+="\nCurrent location code: " + String(locationCode) + "\nCurrent location name: " + String(locationName) + "\nSuccessful: " + String(dataLoadSuccess) + "\nFailures: " + String(dataLoadFailure) + "\nTime since last data load: " + String((int)((millis()-lastDataLoadTime)/1000)) + " seconds";
+  if (dataLoadFailure) message+="\nTime since last failure: " + String((int)((millis()-lastLoadFailure)/1000)) + " seconds";
+  message+="\nLast Result: ";
   switch (boardMode) {
     case MODE_RAIL:
-      message+=raildata->getLastError();
+      if (useRDMclient) message+="RDMClient: " + String(jsonKeyBuffer.lastResultMessage);
+      else message+="darwinClient: " + String(jsonKeyBuffer.lastResultMessage);
       break;
 
     case MODE_TUBE:
-      message+=tfldata->lastErrorMsg;
+      message+=String(jsonKeyBuffer.lastResultMessage);
       break;
 
     case MODE_BUS:
-      message+=busdata->lastErrorMsg;
+      message+=String(jsonKeyBuffer.lastResultMessage);
       break;
   }
-  message+=F("\nUpdate result code: ");
+  message+="\nUpdate result code: ";
   message+=getResultCodeText(lastUpdateResult);
-  message+="\nServices: " + String(station.numServices) + F("\nMessages: ");
+  message+="\nServices: " + String(station.numServices) + "\nMessages: ";
   int nMsgs = messages.numMessages;
   if (boardMode == MODE_TUBE) nMsgs--;
-  message+=String(nMsgs) + F("\n\n");
+  message+=String(nMsgs) + "\n\n";
 
   if (rssEnabled) {
-    message+="Last RSS result: " + rss.getLastError() + F("\nResult code: ");
-    message+=getResultCodeText(lastRssUpdateResult) + F("\nNext RSS update: ") + String(nextRssUpdate-millis()) + F("ms\n\n");
+    message+="Last RSS result: " + getResultCodeText(lastRssUpdateResult) + "\nNext RSS update: " + String(nextRssUpdate-millis()) + "ms\n\n";
   }
 
   if (weatherEnabled) {
-    message+="Last weather result: " + currentWeather.lastErrorMsg + F("\nNext weather update: ") + String(nextWeatherUpdate-millis()) + F("ms");
+    message+="Last weather result: " + getResultCodeText(lastWeatherUpdateResult) + "\nNext weather update: " + String(nextWeatherUpdate-millis()) + "ms";
   }
   sendResponse(200,message,request);
 }
@@ -2173,33 +2277,33 @@ void handleInfo(AsyncWebServerRequest *request) {
 // Stream the index.htm page unless we're in first time setup and need the api keys
 void handleRoot(AsyncWebServerRequest *request) {
   if (!apiKeys) {
-    if (LittleFS.exists(F("/keys.htm"))) handleStreamFile(F("/keys.htm"),request); else handleStreamFlashFile(F("/keys.htm"),keyshtm,sizeof(keyshtm),request);
+    if (LittleFS.exists("/keys.htm")) handleStreamFile("/keys.htm",request); else handleStreamGzipFlashFile("/keys.htm",keyshtm,sizeof(keyshtm),request);
   } else {
-    if (LittleFS.exists(F("/index_d.htm"))) handleStreamFile(F("/index_d.htm"),request); else handleStreamFlashFile(F("/index.htm"),indexhtm,sizeof(indexhtm),request);
+    if (LittleFS.exists("/index_d.htm")) handleStreamFile("/index_d.htm",request); else handleStreamGzipFlashFile("/index.htm",indexhtm,sizeof(indexhtm),request);
   }
 }
 
 // Send the firmware version to the client (called from index.htm)
 void handleFirmwareInfo(AsyncWebServerRequest *request) {
-  String response = "{\"firmware\":\"B" + String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + "-W" + String(WEBAPPVER_MAJOR) + "." + String(WEBAPPVER_MINOR) + F("\"}");
+  String response = "{\"firmware\":\"B" + String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + "-W" + String(WEBAPPVER_MAJOR) + "." + String(WEBAPPVER_MINOR) + "\"}";
   request->send(200,contentTypeJson,response);
 }
 
 // Force a reboot of the ESP32
 void handleReboot(AsyncWebServerRequest *request) {
-  sendResponse(200,F("The Departures Board is restarting..."),request);
+  sendResponse(200,"The Departures Board is restarting...",request);
   restartTimer.once(1, []() { ESP.restart(); });
 }
 
 // Erase the stored WiFiManager credentials
 void handleEraseWiFi(AsyncWebServerRequest *request) {
-  sendResponse(200,F("Erasing stored WiFi settings.\n\nYou will need to connect to the \"Departures Board\" network and use WiFi Manager to reconfigure the settings."),request);
+  sendResponse(200,"Erasing stored WiFi settings.\n\nYou will need to connect to the \"Departures Board\" network and use WiFi Manager to reconfigure the settings.",request);
   restartTimer.once(1, []() { WiFiManager wm; wm.resetSettings(); ESP.restart();});
 }
 
 // "Factory reset" the app - delete WiFi, format file system and reboot
 void handleFactoryReset(AsyncWebServerRequest *request) {
-  sendResponse(200,F("Factory reseting the Departures Board..."),request);
+  sendResponse(200,"Factory reseting the Departures Board...",request);
   restartTimer.once(1, []() { WiFiManager wm; wm.resetSettings(); LittleFS.format(); ESP.restart();});
 }
 
@@ -2210,30 +2314,30 @@ void handleBrightness(AsyncWebServerRequest *request) {
     if (level>0 && level<256) {
       u8g2.setContrast(level);
       brightness = level;
-      sendResponse(200,F("OK"),request);
+      sendResponse(200,"OK",request);
       return;
     }
   }
-  sendResponse(200,F("invalid request"),request);
+  sendResponse(200,"invalid request",request);
 }
 
 // Web GUI has requested updates be installed
 void handleOtaUpdate(AsyncWebServerRequest *request) {
-  sendResponse(200,F("Update initiated - check the Departure Board display for progress."),request);
+  sendResponse(200,"Update initiated - check the Departure Board display for progress.",request);
   manualUpdateCheck = true;
 }
 
 void doManualOtaCheck() {
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
-  centreText(F("Getting latest firmware details from GitHub..."),26);
+  centreText("Getting latest firmware details from GitHub...",26);
   u8g2.sendBuffer();
 
-  if (ghUpdate.getLatestRelease()) {
+  if (ghUpdate.getLatestRelease()==UPD_SUCCESS) {
     checkForFirmwareUpdate();
   } else {
     for (int i=15;i>=0;i--) {
-      showUpdateCompleteScreen("Firmware Update Check Failed","Unable to retrieve latest release information.",ghUpdate.getLastError().c_str(),"",i,false);
+      showUpdateCompleteScreen("Firmware Update Check Failed","Unable to retrieve latest release information.",jsonKeyBuffer.lastResultMessage,"",i,false);
       delay(1000);
     }
   }
@@ -2251,7 +2355,7 @@ void handleControl(AsyncWebServerRequest *request) {
     if (request->getParam("clock")->value() == "1") sleepClock=true; else sleepClock=false;
   }
   resp += (isSleeping || forcedSleep) ? "true":"false";
-  resp += F(",\"display\":");
+  resp += ",\"display\":";
   resp += (sleepClock || (!isSleeping && !forcedSleep)) ? "true":"false";
   resp += "}";
   request->send(200, contentTypeJson, resp);
@@ -2265,13 +2369,13 @@ void handleControl(AsyncWebServerRequest *request) {
 void handleStationPicker(AsyncWebServerRequest *request)
 {
   if (!request->hasParam("q")) {
-    sendResponse(400,F("Missing Query"),request);
+    sendResponse(400,"Missing Query",request);
     return;
   }
 
   String query = request->getParam("q")->value();
   if (query.length() <= 2) {
-    sendResponse(400,F("Query too short"),request);
+    sendResponse(400,"Query too short",request);
     return;
   }
 
@@ -2281,7 +2385,7 @@ void handleStationPicker(AsyncWebServerRequest *request)
   client.setTimeout(4000);
 
   if (!client.connect(host, 443)) {
-    sendResponse(408, F("NR Connect Timeout"),request);
+    sendResponse(408, "NR Connect Timeout",request);
     return;
   }
 
@@ -2299,7 +2403,7 @@ void handleStationPicker(AsyncWebServerRequest *request)
 
   if (!client.available()) {
     client.stop();
-    sendResponse(408,F("NRQ Timeout"),request);
+    sendResponse(408,"NRQ Timeout",request);
   }
 
   String statusLine = client.readStringUntil('\n');
@@ -2341,8 +2445,6 @@ void handleStationPicker(AsyncWebServerRequest *request)
 //
 void departureBoardLoop() {
 
-  if (altStationEnabled && !isSleeping && !touchOverrideAlt && altStationActive != isAltActive() && !fetchInProgress) softResetBoard(MODE_LOADCONFIG,false); // Switch between station views
-
   if (millis() > nextDataUpdate && !fetchInProgress && lastUpdateResult != UPD_UNAUTHORISED && !isSleeping && wifiConnected) {
     if (!firstLoad) showUpdateIcon(true);
     // Initiate a background update on Core 0
@@ -2364,7 +2466,7 @@ void departureBoardLoop() {
       if (!station.service[0].via[0]) isShowingVia=false;
       drawPrimaryService(isShowingVia);
       u8g2.updateDisplayArea(0,1,32,3);
-      if (station.calling[0] && showFullMsgs) {
+      if (station.calling[0] && showFullCalling) {
         for (int i=0;i<numMessages;i++) {
           if (strncmp("Calling",line2[i],7)==0) {
             // refresh the calling at times
@@ -2380,7 +2482,7 @@ void departureBoardLoop() {
   }
 
   if (fetchComplete && lastUpdateResult != UPD_SEC_CHANGE && !isScrollingService && !isSleeping) {
-    if (!isScrollingStops || !showFullMsgs) {
+    if (!isScrollingStops || (!showFullCalling && isShowingCalling) || (!showFullMsgs && !isShowingCalling)) {
       fetchComplete = false;
       // Get the update data if there is any
       if (lastUpdateResult == UPD_SUCCESS) {
@@ -2391,7 +2493,7 @@ void departureBoardLoop() {
         lastDataLoadTime = millis();
         noDataLoaded = false;
         dataLoadSuccess++;
-      } else if (lastUpdateResult == UPD_DATA_ERROR || lastUpdateResult == UPD_TIMEOUT) {
+      } else if (lastUpdateResult == UPD_DATA_ERROR || lastUpdateResult == UPD_TIMEOUT || lastUpdateResult == UPD_HTTP_ERROR) {
         lastLoadFailure=millis();
         dataLoadFailure++;
         if (noDataLoaded) showNoDataScreen();
@@ -2404,7 +2506,7 @@ void departureBoardLoop() {
     }
   }
 
-  if (millis()>timer && numMessages && !isScrollingStops && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR && !noScrolling) {
+  if (millis()>timer && numMessages && !isScrollingStops && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR && !noScrolling && !noDataLoaded) {
     // Need to start a new scrolling line 2
     prevMessage = currentMessage;
     prevScrollStopsLength = scrollStopsLength;
@@ -2414,6 +2516,7 @@ void departureBoardLoop() {
     scrollStopsYpos=10;
     scrollStopsLength = getStringWidth(line2[currentMessage]);
     isScrollingStops=true;
+    if (strncmp("Calling",line2[currentMessage],7)==0) isShowingCalling=true; else isShowingCalling=false;
   }
 
   // Check if there's a via destination
@@ -2426,7 +2529,7 @@ void departureBoardLoop() {
     }
   }
 
-  if (millis()>serviceTimer && !isScrollingService && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
+  if (millis()>serviceTimer && !isScrollingService && !isSleeping && !noDataLoaded && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
     // Need to change to the next service if there is one
     if ((station.numServices <= 1 || (station.numServices==2 && noScrolling)) && !weatherMsg[0]) {
       // There's no other services and no weather so just so static attribution.
@@ -2495,7 +2598,7 @@ void departureBoardLoop() {
 
   if (!isSleeping) {
     // Check if the clock should be updated
-    doClockCheck();
+    if (!firstLoad) drawCurrentTime();
 
     // To ensure a consistent refresh rate (for smooth text scrolling), we update the screen every 25ms (around 40fps)
     // so we need to wait any additional ms not used by processing so far before sending the frame to the display controller
@@ -2529,12 +2632,12 @@ void undergroundArrivalsLoop() {
     updateArrivals();
     // Draw the primary service line(s)
     if (station.numServices) {
-      drawUndergroundService(0,ULINE1);
+      drawUndergroundService(0,ULINE1,(showTubeCurrentLocation && isShowingVia && station.origin[0]));
       if (station.numServices>1) drawUndergroundService(1,ULINE2);
     } else {
       u8g2.setFont(Underground10);
       blankArea(0,ULINE1,256,ULINE3-ULINE1);
-      centreText(F("There are no scheduled arrivals at this station."),ULINE1-1);
+      centreText("There are no scheduled arrivals at this station.",ULINE1-1);
     }
     fullRefresh = true;
   }
@@ -2554,6 +2657,16 @@ void undergroundArrivalsLoop() {
       while (true) delay(10);
     } else {
       dataLoadFailure++;
+    }
+  }
+
+  // Check if we're showing currentLocation
+  if (showTubeCurrentLocation && millis()>viaTimer) {
+    if (station.numServices && station.origin[0] && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
+      isShowingVia = !isShowingVia;
+      drawUndergroundService(0,ULINE1,isShowingVia);
+      u8g2.updateDisplayArea(0,1,32,3);
+      if (isShowingVia) viaTimer = millis()+3000; else viaTimer = millis()+8000;
     }
   }
 
@@ -2644,7 +2757,7 @@ void undergroundArrivalsLoop() {
     // we're scrolling the primary service(s) into view
     u8g2.setClipWindow(0,ULINE1,256,ULINE1+10);
     if (station.numServices) drawUndergroundService(0,scrollPrimaryYpos+ULINE1-1);
-    else centreText(F("There are no scheduled arrivals at this station."),scrollPrimaryYpos+ULINE1-1);
+    else centreText("There are no scheduled arrivals at this station.",scrollPrimaryYpos+ULINE1-1);
     if (station.numServices>1) {
       u8g2.setClipWindow(0,ULINE2,256,ULINE2+10);
       drawUndergroundService(1,scrollPrimaryYpos+ULINE2-1);
@@ -2658,10 +2771,7 @@ void undergroundArrivalsLoop() {
 
   if (!isSleeping) {
     // Check if the clock should be updated
-    if (millis()>nextClockUpdate) {
-      nextClockUpdate = millis()+180;
-      drawCurrentTimeUG(true);
-    }
+    drawCurrentTimeUG();
 
     long delayMs = frameTimeTube - (millis()-refreshTimer);
     if (delayMs>0) delay(delayMs);
@@ -2698,7 +2808,7 @@ void busDeparturesLoop() {
     } else {
       u8g2.setFont(NatRailSmall9);
       blankArea(0,ULINE1,256,ULINE3-ULINE1);
-      centreText(F("There are no scheduled services at this stop."),ULINE1-1);
+      centreText("There are no scheduled services at this stop.",ULINE1-1);
     }
     fullRefresh = true;
   }
@@ -2783,7 +2893,7 @@ void busDeparturesLoop() {
     // we're scrolling the primary service(s) into view
     u8g2.setClipWindow(0,ULINE1,256,ULINE1+10);
     if (station.numServices) drawBusService(0,scrollPrimaryYpos+ULINE1-1,busDestX);
-    else centreText(F("There are no scheduled services at this stop."),scrollPrimaryYpos+ULINE1-1);
+    else centreText("There are no scheduled services at this stop.",scrollPrimaryYpos+ULINE1-1);
     if (station.numServices>1) {
       u8g2.setClipWindow(0,ULINE2,256,ULINE2+10);
       drawBusService(1,scrollPrimaryYpos+ULINE2-1,busDestX);
@@ -2805,12 +2915,8 @@ void busDeparturesLoop() {
   }
 
   if (!isSleeping) {
-    // Check if the clock should be updated
-    if (millis()>nextClockUpdate) {
-      nextClockUpdate = millis()+180;
-      drawCurrentTimeUG(true);    // just use the Tube clock for bus mode
-      u8g2.setFont(NatRailSmall9);
-    }
+    // just use the Tube clock for bus mode
+    if (drawCurrentTimeUG()) u8g2.setFont(NatRailSmall9);
 
     long delayMs = frameTimeBus - (millis()-refreshTimer);
     if (delayMs>0) delay(delayMs);
@@ -2831,15 +2937,19 @@ void fetchDeparturesTask(void *pvParameters) {
       case FETCH_BOARD:
         switch (boardMode) {
           case MODE_RAIL:
-            lastUpdateResult = raildata->fetchDepartures(&station,&messages,crsCode,nrToken,MAXBOARDSERVICES,enableBus,callingCrsCode,cleanPlatformFilter,nrTimeOffset,(showLastSeen && !noScrolling));
+            if (useRDMclient) {
+              lastUpdateResult = rdmRailData.fetchDepartures(&station,&messages,locationCode,rdmDeparturesApiKey,rdmServiceApiKey,MAXBOARDSERVICES,enableBus,callingCrsCode,locationCleanFilter,nrTimeOffset,(showLastSeen && !noScrolling),showServiceMsgs);
+            } else {
+              lastUpdateResult = darwinRailData.fetchDepartures(&station,&messages,locationCode,nrToken,MAXBOARDSERVICES,enableBus,callingCrsCode,locationCleanFilter,nrTimeOffset,(showLastSeen && !noScrolling),showServiceMsgs);
+            }
             nextDataUpdate = millis()+apiRefreshRate;
             break;
           case MODE_TUBE:
-            lastUpdateResult = tfldata->fetchArrivals(&station,&messages,tubeId,lineId,lineDirection,noScrolling,tflAppkey);
+            lastUpdateResult = tfldata.fetchArrivals(&station,&messages,locationCode,lineId,lineDirection,(noScrolling || !showServiceMsgs),tflAppKey);
             nextDataUpdate = millis() + UGDATAUPDATEINTERVAL; // default update freq
             break;
           case MODE_BUS:
-            lastUpdateResult = busdata->fetchDepartures(&station,busAtco,cleanBusFilter);
+            lastUpdateResult = busdata.fetchDepartures(&station,locationCode,locationCleanFilter);
             nextDataUpdate = millis() + BUSDATAUPDATEINTERVAL;
             break;
         }
@@ -2848,7 +2958,7 @@ void fetchDeparturesTask(void *pvParameters) {
 
       case FETCH_WEATHER:
         // Update the weather forecast
-        lastWeatherUpdateResult = currentWeather.updateWeather(openWeatherMapApiKey, String(stationLat), String(stationLon));
+        lastWeatherUpdateResult = currentWeather.updateWeather(openWeatherMapApiKey, String(locationLat), String(locationLon));
         nextWeatherUpdate = millis() + WEATHERUPDATEINTERVAL; // update every 20 mins
         weatherFetchComplete = true;
         break;
@@ -2871,8 +2981,8 @@ void fetchDeparturesTask(void *pvParameters) {
 //
 void setup(void) {
   // These are the default wsdl XML SOAP entry points. They can be overridden in the config.json file if necessary
-  strncpy(wsdlHost,"lite.realtime.nationalrail.co.uk",sizeof(wsdlHost));
-  strncpy(wsdlAPI,"/OpenLDBWS/wsdl.aspx?ver=2021-11-01",sizeof(wsdlAPI));
+  strlcpy(wsdlHost,"lite.realtime.nationalrail.co.uk",sizeof(wsdlHost));
+  strlcpy(wsdlAPI,"/OpenLDBWS/wsdl.aspx?ver=2021-11-01",sizeof(wsdlAPI));
   u8g2.begin();                       // Start the OLED panel
   u8g2.setContrast(brightness);       // Initial brightness
   u8g2.setDrawColor(1);               // Only a monochrome display, so set the colour to "on"
@@ -2881,15 +2991,15 @@ void setup(void) {
   u8g2.setFontPosTop();               // Reference from top
   u8g2.setFont(NatRailTall12);
   String buildDate = String(__DATE__);
-  String notice = "\x80 " + buildDate.substring(buildDate.length()-4) + F(" Gadec Software (github.com/gadec-uk)");
+  String notice = "\x80 " + buildDate.substring(buildDate.length()-4) + " Gadec Software (github.com/gadec-uk)";
 
   bool isFSMounted = LittleFS.begin(true);    // Start the File System, format if necessary
   strcpy(station.location,"");                // No default location
   strcpy(weatherMsg,"");                      // No weather message
   strcpy(nrToken,"");                         // No default National Rail token
-  tflAppkey="";                               // No default TfL AppKey
+  strcpy(tflAppKey,"");                       // No default TfL app_key
   loadApiKeys();                              // Load the API keys from the apiKeys.json
-  loadConfig();                               // Load the configuration settings from config.json
+  loadConfig(true);                           // Load the configuration settings from config.json
   u8g2.setContrast(brightness);               // Set the panel brightness to the user saved level
   if (flipScreen) u8g2.setFlipMode(1);
   u8g2.clearBuffer();
@@ -2901,7 +3011,7 @@ void setup(void) {
   u8g2.clearBuffer();
   drawStartupHeading();
   u8g2.sendBuffer();
-  progressBar(F("Connecting to Wi-Fi"),20);
+  progressBar("Connecting to Wi-Fi",20);
   WiFi.mode(WIFI_MODE_NULL);        // Reset the WiFi
   WiFi.setSleep(WIFI_PS_NONE);      // Turn off WiFi Powersaving
   WiFi.hostname(hostname);          // Set the hostname ("Departures Board")
@@ -2937,7 +3047,7 @@ void setup(void) {
   char ipBuff[17];
   WiFi.localIP().toString().toCharArray(ipBuff,sizeof(ipBuff));   // Get the IP address of the ESP32
   centreText(ipBuff,53);                                          // Display the IP address
-  progressBar(F("Wi-Fi Connected"),30);
+  progressBar("Wi-Fi Connected",30);
   u8g2.sendBuffer();                                              // Send to OLED panel
 
   // Configure the local webserver paths
@@ -2964,21 +3074,21 @@ void setup(void) {
   server.on("/savesettings", HTTP_POST, [](AsyncWebServerRequest *request) {
     if (request->_tempObject) {
       String* body = (String*)(request->_tempObject);
-      saveFile(F("/config.json"), body->c_str());
+      saveFile("/config.json", body->c_str());
 
       delete body; // Clean up memory
       request->_tempObject = nullptr;
 
-      if ((!crsCode[0] && !tubeId[0]) || request->hasParam("reboot")) {
+      if ((!railIsSet && !tubeIsSet && !busIsSet) || request->hasParam("reboot")) {
         // First time setup or base config change, we need a full reboot
-        sendResponse(200,F("Configuration saved. The Departures Board will now restart."),request);
+        sendResponse(200,"Configuration saved. The Departures Board will now restart.",request);
         restartTimer.once(1, []() { ESP.restart(); });
       } else {
-        sendResponse(200,F("Configuration updated. The Departures Board will update shortly."),request);
+        sendResponse(200,"Configuration updated. The Departures Board will update shortly.",request);
         softResetNeeded = true;
       }
     } else {
-      sendResponse(400,F("Empty"),request);
+      sendResponse(400,"Empty",request);
     }
   }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
     if (!index) {
@@ -3001,19 +3111,20 @@ void setup(void) {
 
       JsonDocument doc;
       bool result = true;
-      String msg = F("The API keys have been saved successfully.");
+      String msg = "The API keys have been saved successfully.";
       DeserializationError error = deserializeJson(doc, body->c_str());
       if (!error) {
-        if (!saveFile(F("/apikeys.json"), body->c_str())) {
-          msg = F("Failed to save the API keys to the file system (file system corrupt or full?)");
+        if (!saveFile("/apikeys.json", body->c_str())) {
+          msg = "Failed to save the API keys to the file system (file system corrupt or full?)";
           result = false;
         } else {
           JsonObject settings = doc.as<JsonObject>();
-          String nrToken = settings[F("nrToken")].as<String>();
-          if (!nrToken.length()) msg+=F("\n\nNote: Only Tube and Bus Departures will be available without a National Rail token.");
+          String nrToken = settings["nrToken"].as<String>();
+          String rdmDepToken = settings["rdmDepKey"].as<String>();
+          if (!nrToken.length() && !rdmDepToken.length()) msg+="\n\nNote: Only Tube and Bus Departures will be available without either Rail Data or National Rail keys.";
         }
       } else {
-        msg = F("Invalid JSON format. No changes have been saved.");
+        msg = "Invalid JSON format. No changes have been saved.";
         result = false;
       }
 
@@ -3024,12 +3135,12 @@ void setup(void) {
         // Load/Update the API Keys in memory
         loadApiKeys();
         // If all location codes are blank we're in the setup process. If not, the keys have been changed so just reboot.
-        if (!crsCode[0] && !tubeId[0] && !busAtco[0]) {
+        if (!railIsSet && !tubeIsSet && !busIsSet) {
           sendResponse(200,msg,request);
           writeDefaultConfig();
           showSetupCrsHelpScreen();
         } else {
-          msg += F("\n\nThe Departures Board will now restart.");
+          msg += "\n\nThe Departures Board will now restart.";
           sendResponse(200,msg,request);
           restartTimer.once(1, []() { ESP.restart(); });
         }
@@ -3037,7 +3148,7 @@ void setup(void) {
         sendResponse(400,msg,request);
       }
     } else {
-      sendResponse(400,F("Empty"),request);
+      sendResponse(400,"Empty",request);
     }
   }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
     if (!index) {
@@ -3065,7 +3176,7 @@ void setup(void) {
       size_t availableSpace = LittleFS.totalBytes() - LittleFS.usedBytes() - 1024;
 
       if (fileSize > availableSpace) {
-          sendResponse(507,F("Insufficient storage space in File System"),request);
+          sendResponse(507,"Insufficient storage space in File System",request);
           request->client()->close();
           return;
       }
@@ -3073,7 +3184,7 @@ void setup(void) {
       // We use a pointer to a File object so we can keep it open between chunks
       File *file = new File(LittleFS.open(path, FILE_WRITE));
       if (!*file) {
-        sendResponse(500,F("File System Error"),request);
+        sendResponse(500,"File System Error",request);
         request->client()->close();
         return;
       }
@@ -3115,21 +3226,21 @@ void setup(void) {
       // First chunk: Initialize the OTA Update
       // UPDATE_SIZE_UNKNOWN tells the library to just accept chunks until 'final' is true
       if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
-        sendResponse(500,F("Update begin failed"),request);
+        sendResponse(500,"Update begin failed",request);
       }
     }
 
     // Write chunk data to the flash memory
     if (!Update.hasError() && len) {
       if (Update.write(data, len) != len) {
-        sendResponse(500,F("Update write failed"),request);
+        sendResponse(500,"Update write failed",request);
       }
     }
 
     // Final chunk: Close the OTA process
     if (final) {
       if (!Update.end(true)) {
-        sendResponse(500,F("Update end failed"),request);
+        sendResponse(500,"Update end failed",request);
       }
     }
   });
@@ -3138,12 +3249,12 @@ void setup(void) {
 
   // Check for Firmware updates?
   if (firmwareUpdates) {
-    progressBar(F("Checking for firmware updates"),40);
-    if (ghUpdate.getLatestRelease()) {
+    progressBar("Checking for firmware updates",40);
+    if (ghUpdate.getLatestRelease()==UPD_SUCCESS) {
       checkForFirmwareUpdate();
     } else {
       for (int i=15;i>=0;i--) {
-        showUpdateCompleteScreen("Firmware Update Check Failed","Unable to retrieve latest release information.",ghUpdate.getLastError().c_str(),"",i,false);
+        showUpdateCompleteScreen("Firmware Update Check Failed","Unable to retrieve latest release information.",jsonKeyBuffer.lastResultMessage,"",i,false);
         delay(1000);
       }
       u8g2.clearDisplay();
@@ -3154,7 +3265,7 @@ void setup(void) {
   checkPostWebUpgrade();
 
   // First time configuration?
-  if ((!crsCode[0] && !tubeId[0] && !busAtco[0]) || (!nrToken[0] && boardMode==MODE_RAIL)) {
+  if ((!railIsSet && !tubeIsSet && !busIsSet) || (!nrToken[0] && rdmDeparturesApiKey=="" && boardMode==MODE_RAIL)) {
     if (!apiKeys) showSetupKeysHelpScreen();
     else showSetupCrsHelpScreen();
     // First time setup mode will exit with a reboot, so just loop here forever
@@ -3171,40 +3282,37 @@ void setup(void) {
   int p=50;
   int ntpAttempts=0;
   bool ntpResult=true;
-  progressBar(F("Setting the system clock..."),50);
+  progressBar("Setting the system clock...",50);
   if(!getLocalTime(&timeinfo,2000)) {              // attempt to set the clock from NTP
     do {
       ntpResult = getLocalTime(&timeinfo,2000);
       ntpAttempts++;
       p+=5;
-      progressBar(F("Setting the system clock..."),p);
+      progressBar("Setting the system clock...",p);
       if (p>80) p=45;
     } while ((!ntpResult) && (ntpAttempts<10));
   }
   if (!ntpResult) {
     // Sometimes NTP/UDP fails. A reboot usually fixes it.
-    progressBar(F("Failed to set the clock. Rebooting in 5 sec."),0);
+    progressBar("Failed to set the clock. Rebooting in 5 sec.",0);
     delay(5000);
     ESP.restart();
   }
   prevUpdateCheckDay = timeinfo.tm_mday;
+  sprintf(currentTime,"%02d:%02d:%02d",timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec);
+
+  // Reload settings (clock has now been set)
+  loadConfig();
 
   station.numServices=0;
   if (rssEnabled && boardMode!=MODE_BUS) {
-    progressBar(F("Loading RSS headlines feed"),60);
+    progressBar("Loading RSS headlines feed",60);
     updateRssFeed();
   }
 
-  if (boardMode == MODE_BUS) {
-      stationLat = busLat;
-      stationLon = busLon;
-  } else if (boardMode == MODE_TUBE) {
-      stationLat = tubeLat;
-      stationLon = tubeLon;
-  }
   if (weatherEnabled) {
-    progressBar(F("Getting weather conditions"),64);
-    updateCurrentWeather(stationLat,stationLon);
+    progressBar("Getting weather conditions",64);
+    updateCurrentWeather(locationLat,locationLon);
   }
 
   // Create the background task pinned to Core 0
@@ -3219,26 +3327,25 @@ void setup(void) {
   );
 
   if (boardMode == MODE_RAIL) {
-      progressBar(F("Initialising National Rail interface"),67);
-      altStationActive = setAlternateStation(false);  // Check & set the alternate station if appropriate
-      raildata = new raildataXmlClient();
-      int res = raildata->init(wsdlHost, wsdlAPI);
-      if (res != UPD_SUCCESS) {
-        showWsdlFailureScreen();
-        while (true) {delay(1);}
+      if (!useRDMclient) {
+        // Using legacy darwin XML client
+        progressBar("Initialising National Rail interface",67);
+        int res = darwinRailData.init(wsdlHost, wsdlAPI);
+        if (res != UPD_SUCCESS) {
+          showWsdlFailureScreen();
+          while (true) {delay(1);}
+        }
       }
-      progressBar(F("Initialising National Rail interface"),70);
-      raildata->cleanFilter(platformFilter,cleanPlatformFilter,sizeof(platformFilter));
+      progressBar("Initialising National Rail interface",70);
+      rdmRailData.cleanFilter(locationFilter,locationCleanFilter,sizeof(locationFilter));
       startupProgressPercent=70;
   } else if (boardMode == MODE_TUBE) {
-      progressBar(F("Initialising TfL interface"),70);
-      tfldata = new TfLdataClient();
+      progressBar("Initialising TfL interface",70);
       startupProgressPercent=70;
   } else if (boardMode == MODE_BUS) {
-      progressBar(F("Initialising BusTimes interface"),70);
-      busdata = new busDataClient();
+      progressBar("Initialising BusTimes interface",70);
       // Create a cleaned filter
-      busdata->cleanFilter(busFilter,cleanBusFilter,sizeof(busFilter));
+      busdata.cleanFilter(locationFilter,locationCleanFilter,sizeof(locationFilter));
       startupProgressPercent=70;
   }
 }
@@ -3255,25 +3362,25 @@ void loop(void) {
     } else {
       switchToNextMode();
     }
-  } else if (button.wasLongTapped() && boardMode==MODE_RAIL && altStationEnabled && !isSleeping) {
-    if (fetchInProgress) {
-      // Wait for the background fetch to finish before we soft reset
-      showSwitchScreen(false);
-      while (fetchInProgress) delay(50);
+  }
+
+  if (millis()-lastTimeUpdate >= 100) {
+    // Update the current time
+    if (getLocalTime(&timeinfo)) {
+      sprintf(currentTime,"%02d:%02d:%02d",timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec);
+      lastTimeUpdate = millis();
+      if (millis()>3888000000 && timeinfo.tm_hour==3) ESP.restart(); // Reboot every 45 days at 3am
     }
-    softResetBoard(MODE_RAIL,true);
   }
 
   // Check for firmware updates daily if enabled
   if (dailyUpdateCheck && !fetchInProgress && millis()>fwUpdateCheckTimer) {
     fwUpdateCheckTimer = millis() + 3300000 + random(600000); // check again in 55 to 65 mins
-    if (getLocalTime(&timeinfo)) {
-      if (timeinfo.tm_mday != prevUpdateCheckDay) {
-        if (ghUpdate.getLatestRelease()) {
-          checkForFirmwareUpdate();
-          prevUpdateCheckDay = timeinfo.tm_mday;
-        }
+    if (timeinfo.tm_mday != prevUpdateCheckDay) {
+      if (ghUpdate.getLatestRelease()==UPD_SUCCESS) {
+        checkForFirmwareUpdate();
       }
+      prevUpdateCheckDay = timeinfo.tm_mday;
     }
   }
 
@@ -3285,7 +3392,7 @@ void loop(void) {
     timer=millis() + SCREENSAVERINTERVAL;
   } else if (wasSleeping && !isSleeping) {
     // Exit sleep mode cleanly
-    softResetBoard(MODE_LOADCONFIG,false);
+    softResetBoard(MODE_LOADCONFIG);
   }
 
   // WiFi Status icon
@@ -3338,7 +3445,7 @@ void loop(void) {
     if (lastRssUpdateResult == UPD_SUCCESS) buildRssMessage();
   }
 
-  if (weatherEnabled && millis()>nextWeatherUpdate && !fetchInProgress && stationLat && stationLon && !isSleeping && wifiConnected) {
+  if (weatherEnabled && millis()>nextWeatherUpdate && !fetchInProgress && locationLat && locationLon && !isSleeping && wifiConnected) {
     // Start a weather update on Core 0
     fetchMode = FETCH_WEATHER;
     fetchInProgress = true;
@@ -3348,9 +3455,7 @@ void loop(void) {
   if (weatherFetchComplete) {
     weatherFetchComplete = false;
     if (lastWeatherUpdateResult == UPD_SUCCESS) {
-      currentWeather.currentWeather.toCharArray(weatherMsg,sizeof(weatherMsg));
-      weatherMsg[0] = toUpperCase(weatherMsg[0]);
-      weatherMsg[sizeof(weatherMsg)-1] = '\0';
+      strlcpy(weatherMsg,currentWeather.currentWeatherMessage,MAXWEATHERSIZE);
     } else {
       weatherMsg[0] = '\0';
     }
@@ -3358,7 +3463,16 @@ void loop(void) {
 
   if (softResetNeeded && !fetchInProgress) {
     softResetNeeded=false;
-    softResetBoard(MODE_LOADCONFIG,false);
+    softResetBoard(MODE_LOADCONFIG);
+  }
+
+  if ((schedulerActive || (carouselActive && numCarouselSlots>1)) && !isSleeping && !fetchInProgress && millis() > nextSchedulerCheck) {
+    int nowTime = getTimeInMinutes();
+    if ((activeSlotEventTime < nextSlotEventTime && nowTime >= nextSlotEventTime) || (activeSlotEventTime > nextSlotEventTime && nowTime < activeSlotEventTime && nowTime >= nextSlotEventTime)) {
+      if (carouselActive) currentCarouselSlot = (currentCarouselSlot + 1) % numCarouselSlots;
+      softResetBoard(MODE_LOADCONFIG);
+    }
+    nextSchedulerCheck = millis() + 10000;  // ten seconds
   }
 
 }

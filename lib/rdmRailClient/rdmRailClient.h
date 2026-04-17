@@ -1,7 +1,7 @@
 /*
  * Departures Board (c) 2025-2026 Gadec Software
  *
- * raildataXmlClient Library
+ * rdmRailClient Library
  *
  * https://github.com/gadec-uk/departures-board
  *
@@ -10,8 +10,8 @@
  */
 
 #pragma once
-#include <xmlListener.h>
-#include <xmlStreamingParser.h>
+#include "JsonListenerGS.h"
+#include "JsonStreamingParserGS.h"
 #include <sharedDataStructs.h>
 #include <responseCodes.h>
 
@@ -20,7 +20,7 @@
 #define MAXPLATFORMFILTERSIZE 25
 
 
-class raildataXmlClient: public xmlListener {
+class rdmRailClient: public JsonListenerGS {
 
     private:
 
@@ -30,20 +30,13 @@ class raildataXmlClient: public xmlListener {
           char actualTime[6];
         };
 
-        String greatGrandParentTagName = "";
-        String grandParentTagName = "";
-        String parentTagName = "";
-        String tagName = "";
-        String tagPath = "";
-        int tagLevel = 0;
-        bool loadingWDSL=false;
+        const char* rdmHost = "api1.raildata.org.uk";
+        const char* rdmDeparturesApi = "/1010-live-departure-board-dep1_2/LDBWS/api/20220120/GetDepBoardWithDetails/";
+        const char* rdmServiceDetailApi = "/1010-service-details1_2/LDBWS/api/20220120/GetServiceDetails/";
+
+        int inCallingArray = 0;
+        int arrayNestLevel = 0;
         bool fetchingDepartures;
-        String soapURL = "";
-        char soapHost[MAXHOSTSIZE];
-        char soapAPI[MAXAPIURLSIZE];
-
-        String currentPath = "";
-
         rdiStation* xStation = nullptr;
         stnMessages* xMessages = nullptr;
         sharedBufferSpace* js = nullptr;
@@ -72,20 +65,23 @@ class raildataXmlClient: public xmlListener {
         void deleteService(int x);
         void trim(char* &start, char* &end);
         bool equalsIgnoreCase(const char* a, int a_len, const char* b);
-        void trimSpaces(char *text);
         bool serviceMatchesFilter(const char* filter, const char* serviceId);
-        int getServiceDetails(const char *serviceID, const char *customToken);
+        void trimSpaces(char *text);
+        int getServiceDetails(const char *serviceID, String apiToken);
 
-        virtual void startTag(const char *tagName);
-        virtual void endTag(const char *tagName);
-        virtual void parameter(const char *param);
+        virtual void whitespace(char c);
+        virtual void startDocument();
+        virtual void key(const char *key);
         virtual void value(const char *value);
-        virtual void attribute(const char *attribute);
+        virtual void endArray();
+        virtual void endObject();
+        virtual void endDocument();
+        virtual void startArray();
+        virtual void startObject();
 
     public:
-        raildataXmlClient(rdiStation *station, stnMessages *messages, sharedBufferSpace *sharedBuffer);
-        int init(const char *wsdlHost, const char *wsdlAPI);
+        rdmRailClient(rdiStation *station, stnMessages *messages, sharedBufferSpace *sharedBuffer);
         void cleanFilter(const char* rawFilter, char* cleanedFilter, size_t maxLen);
-        int fetchDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms, int timeOffset, bool fetchLastSeen, bool includeServiceMessages);
+        int fetchDepartures(rdStation *station, stnMessages *messages, const char *crsCode, String departuresApiKey, String serviceApiKey, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms, int timeOffset, bool fetchLastSeen, bool includeServiceMessages);
         void loadDepartures(rdStation *station, stnMessages *messages);
 };

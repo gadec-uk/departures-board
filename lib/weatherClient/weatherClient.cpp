@@ -10,17 +10,17 @@
  */
 
 #include <weatherClient.h>
-#include <JsonListener.h>
+#include <JsonListenerGS.h>
 #include <WiFiClient.h>
 
-weatherClient::weatherClient() {}
+weatherClient::weatherClient(sharedBufferSpace *sharedBuffer) : js(sharedBuffer) {}
 
 int weatherClient::updateWeather(String apiKey, String lat, String lon) {
 
     unsigned long perfTimer = millis();
-    lastErrorMsg = "";
+    currentWeatherMessage[0] = '\0';
 
-    JsonStreamingParser parser;
+    JsonStreamingParserGS parser;
     parser.setListener(this);
     WiFiClient httpClient;
 
@@ -29,11 +29,10 @@ int weatherClient::updateWeather(String apiKey, String lat, String lon) {
         delay(200);
     }
     if (retryCounter>=15) {
-        lastErrorMsg += F("Connection timeout");
         return UPD_NO_RESPONSE;
     }
 
-    String request = "GET /data/2.5/weather?units=metric&lang=en&lat=" + lat + F("&lon=") + lon + F("&appid=") + apiKey + F(" HTTP/1.0\r\nHost: ") + String(apiHost) + F("\r\nConnection: close\r\n\r\n");
+    String request = "GET /data/2.5/weather?units=metric&lang=en&lat=" + lat + "&lon=" + lon + "&appid=" + apiKey + " HTTP/1.0\r\nHost: " + String(apiHost) + "\r\nConnection: close\r\n\r\n";
     httpClient.print(request);
     retryCounter=0;
     while(!httpClient.available() && retryCounter++ < 40) {
@@ -43,23 +42,19 @@ int weatherClient::updateWeather(String apiKey, String lat, String lon) {
     if (!httpClient.available()) {
         // no response within 8 seconds so exit
         httpClient.stop();
-        lastErrorMsg += F("Response timeout (GET)");
         return UPD_TIMEOUT;
     }
 
     // Parse status code
     String statusLine = httpClient.readStringUntil('\n');
-    if (!statusLine.startsWith(F("HTTP/")) || statusLine.indexOf(F("200 OK")) == -1) {
+    if (!statusLine.startsWith("HTTP/") || statusLine.indexOf("200 OK") == -1) {
         httpClient.stop();
 
-        if (statusLine.indexOf(F("401")) > 0) {
-            lastErrorMsg = F("Not Authorized");
+        if (statusLine.indexOf("401") > 0) {
             return UPD_UNAUTHORISED;
-        } else if (statusLine.indexOf(F("500")) > 0) {
-            lastErrorMsg = F("Server Error");
+        } else if (statusLine.indexOf("500") > 0) {
             return UPD_DATA_ERROR;
         } else {
-            lastErrorMsg = statusLine;
             return UPD_HTTP_ERROR;
         }
     }
@@ -85,39 +80,43 @@ int weatherClient::updateWeather(String apiKey, String lat, String lon) {
     }
     httpClient.stop();
     if (millis() >= dataSendTimeout) {
-        lastErrorMsg += F("Data timeout");
         return UPD_TIMEOUT;
     }
 
-    lastErrorMsg="Success - took " + String(millis()-perfTimer) + F("ms");
-
-    currentWeather = description + " " + String((int)round(temperature)) + F("\xB0 Wind: ") + String((int)round(windSpeed)) + F("mph");
+    if (currentWeatherMessage[0]) {
+        sprintf(currentWeatherMessage + strlen(currentWeatherMessage)," %d\xB0 Wind: %dmph",(int)round(temperature),(int)round(windSpeed));
+        currentWeatherMessage[0] = toUpperCase(currentWeatherMessage[0]);
+    }
     return UPD_SUCCESS;
 }
 
 void weatherClient::whitespace(char c) {}
 
-void weatherClient::startDocument() {}
-
-void weatherClient::key(String key) {
-    currentKey = key;
+void weatherClient::startDocument() {
+    js->currentPath[0] = '\0';
+    js->arrayName[0] = '\0';
+    js->objectCurrentKey[0] = '\0';
 }
 
-void weatherClient::value(String value) {
-    if (currentObject == F("weather") && weatherItem==0) {
+void weatherClient::key(const char *key) {
+    strlcpy(js->currentKey,key,MAXKEYNAMESIZE);
+}
+
+void weatherClient::value(const char *value) {
+    if (strcmp(js->objectCurrentKey, "weather")==0 && weatherItem==0) {
         // Only read the first weather entry in the array
-        if (currentKey == F("description")) description = value;
+        if (strcmp(js->currentKey, "description")==0) strlcpy(currentWeatherMessage,value,32);
     }
-    else if (currentKey == F("temp")) temperature = value.toFloat();
+    else if (strcmp(js->currentKey, "temp")==0) temperature = atof(value);
     // Windspeed reported in mps, converting to mph
-    else if (currentKey == F("speed")) windSpeed = value.toFloat() * 2.23694;
+    else if (strcmp(js->currentKey, "speed")==0) windSpeed = atof(value) * 2.23694;
 }
 
 void weatherClient::endArray() {}
 
 void weatherClient::endObject() {
-    if (currentObject == F("weather")) weatherItem++;
-    currentObject = "";
+    if (strcmp(js->objectCurrentKey, "weather")==0) weatherItem++;
+    js->objectCurrentKey[0] = '\0';
 }
 
 void weatherClient::endDocument() {}
@@ -125,5 +124,5 @@ void weatherClient::endDocument() {}
 void weatherClient::startArray() {}
 
 void weatherClient::startObject() {
-    currentObject = currentKey;
+    strcpy(js->objectCurrentKey,js->currentKey);
 }
