@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 
 # Define the folder containing your source web files
 SOURCE_DIR = "web"
@@ -18,7 +19,7 @@ def build_web_headers(target=None, source=None, env=None):
             output_path = os.path.join(INCLUDE_DIR, f"{base_name}.h")
 
             print(f"--- Generating {base_name}.h ---")
-            subprocess.run(["python", "scripts/header_tool.py", input_path, output_path])
+            subprocess.run([sys.executable, "scripts/header_tool.py", input_path, output_path])
 
 # PlatformIO Hook
 try:
