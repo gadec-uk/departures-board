@@ -1524,7 +1524,7 @@ bool checkForFirmwareUpdate() {
   const char* msgTitle = "Firmware Update";
   switch (ret) {
     case HTTP_UPDATE_FAILED:
-      LOG_ERRORf("UPDATE", "The update failed with error %d", httpUpdate.getLastError());
+      LOG_ERRORf("UPDATE", "Update failed: %s (Error %d)", httpUpdate.getLastErrorString().c_str(), httpUpdate.getLastError());
       sprintf(msg,"The update failed with error %d.",httpUpdate.getLastError());
       result=false;
       for (int i=20;i>=0;i--) {
@@ -1534,6 +1534,7 @@ bool checkForFirmwareUpdate() {
       break;
 
     case HTTP_UPDATE_NO_UPDATES:
+      LOG_INFO("UPDATE", "No firmware updates were available.");
       for (int i=10;i>=0;i--) {
         showUpdateCompleteScreen(msgTitle,"","No firmware updates were available.","",i,false);
         delay(1000);
@@ -1541,6 +1542,7 @@ bool checkForFirmwareUpdate() {
       break;
 
     case HTTP_UPDATE_OK:
+      LOG_INFO("UPDATE", "Firmware update completed successfully.");
       for (int i=20;i>=0;i--) {
         showUpdateCompleteScreen(msgTitle,"The firmware update has completed successfully.","For more information visit the URL below:","github.com/gadec-uk/departures-board/releases",i,true);
         delay(1000);
@@ -2047,6 +2049,13 @@ void updateBusDepartures() {
 
 // Helper function for returning text status messages
 void sendResponse(int code, String msg, AsyncWebServerRequest *request) {
+  if (code >= 500) {
+    LOG_ERRORf("WEB", "HTTP %d: %s", code, msg.c_str());
+  } else if (code >= 400) {
+    LOG_WARNf("WEB", "HTTP %d: %s", code, msg.c_str());
+  } else {
+    LOG_INFOf("WEB", "HTTP %d: %s", code, msg.c_str());
+  }
   request->send(code,contentTypeText,msg);
 }
 
@@ -3170,6 +3179,7 @@ void setup(void) {
         }
       } else {
         msg = "Invalid JSON format. No changes have been saved.";
+        LOG_WARN("CONFIG", "Invalid JSON format received for API keys.");
         result = false;
       }
 
