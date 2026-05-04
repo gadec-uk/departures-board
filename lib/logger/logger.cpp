@@ -20,11 +20,11 @@
  */
 
 #include "logger.hpp"
-#include "boardLED.hpp"
+// #include "boardLED.hpp"
 #include <HardwareSerial.h>
 #include <stdarg.h>
 
-#if CORE_DEBUG_LEVEL >= APP_LOG_LEVEL_ERROR
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_ERROR
 
 std::vector<String>
     Logger::secrets; // Registry of sensitive strings to be redacted
@@ -46,7 +46,7 @@ void Logger::begin(unsigned long baud) {
  * @param timeout_ms Maximum time to wait in milliseconds.
  */
 void Logger::waitForSerial(uint32_t timeout_ms) {
-  BoardLED::init();
+  // BoardLED::init();
   uint32_t startAt = millis();
   uint32_t lastFlip = 0;
   uint32_t lastPrint = 0;
@@ -58,7 +58,7 @@ void Logger::waitForSerial(uint32_t timeout_ms) {
 
     // LED Flip logic
     if ((now - lastFlip) >= currentInterval) {
-      BoardLED::flip();
+      // BoardLED::flip();
       lastFlip = now;
     }
 
@@ -77,7 +77,7 @@ void Logger::waitForSerial(uint32_t timeout_ms) {
   }
 
   // Guarantee LED is OFF when exiting this wait loop
-  BoardLED::off();
+  // BoardLED::off();
 }
 
 /**
@@ -307,4 +307,4 @@ void Logger::_verbosef(const char *category, const char *format, ...) {
   printRedacted("🟣", category, buffer);
 }
 
-#endif // CORE_DEBUG_LEVEL >= APP_LOG_LEVEL_ERROR
+#endif // APP_DEBUG_LEVEL >= APP_LOG_LEVEL_ERROR

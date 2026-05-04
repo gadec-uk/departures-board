@@ -26,6 +26,7 @@
  */
 
 #include <Arduino.h>
+#include <logger.hpp>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
@@ -1358,6 +1359,9 @@ void softResetBoard(boardModes requestedMode) {
 
   // Reload the settings
   loadConfig(false,requestedMode);
+  if (boardMode == MODE_RAIL) LOG_SPLASH("Operating Mode: RAIL");
+  else if (boardMode == MODE_TUBE) LOG_SPLASH("Operating Mode: TUBE");
+  else if (boardMode == MODE_BUS) LOG_SPLASH("Operating Mode: BUS");
   if (flipScreen) u8g2.setFlipMode(1); else u8g2.setFlipMode(0);
   if (timezone!="") {
     setenv("TZ",timezone.c_str(),1);
@@ -1464,6 +1468,7 @@ void switchToNextMode() {
 
 // WiFiManager callback, entered config mode
 void wmConfigModeCallback (WiFiManager *myWiFiManager) {
+  LOG_SPLASH("Setup/Config portal active");
   showSetupScreen();
   wifiConfigured = true;
 }
@@ -2337,6 +2342,7 @@ void handleOtaUpdate(AsyncWebServerRequest *request) {
 }
 
 void doManualOtaCheck() {
+  LOG_SPLASH("Entering OTA mode (Manual)");
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
   centreText("Getting latest firmware details from GitHub...",26);
@@ -2990,6 +2996,9 @@ void fetchDeparturesTask(void *pvParameters) {
 // Setup code
 //
 void setup(void) {
+  LOG_BEGIN(115200);
+  LOG_SPLASH("Booting Departures Board...");
+
   // These are the default wsdl XML SOAP entry points. They can be overridden in the config.json file if necessary
   strlcpy(wsdlHost,"lite.realtime.nationalrail.co.uk",sizeof(wsdlHost));
   strlcpy(wsdlAPI,"/OpenLDBWS/wsdl.aspx?ver=2021-11-01",sizeof(wsdlAPI));
@@ -3236,6 +3245,7 @@ void setup(void) {
   }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
     if (!index) {
       // First chunk: Initialize the OTA Update
+      LOG_SPLASH("Entering OTA mode (Web Update)");
       // UPDATE_SIZE_UNKNOWN tells the library to just accept chunks until 'final' is true
       if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
         sendResponse(500,"Update begin failed",request);
@@ -3363,6 +3373,11 @@ void setup(void) {
 
 
 void loop(void) {
+  static unsigned long nextHeartbeat = 0;
+  if (millis() > nextHeartbeat) {
+    LOG_INFO("SYSTEM", "Heartbeat");
+    nextHeartbeat = millis() + 10000;
+  }
 
   if (touchEnabled) button.updateTouchState();
 
