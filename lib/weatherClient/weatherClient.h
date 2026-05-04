@@ -1,7 +1,7 @@
 /*
  * Departures Board (c) 2025-2026 Gadec Software
  *
- * OpenWeatherMap Weather Client Library
+ * Open-Meteo / OpenWeather Map Weather Client Library
  *
  * https://github.com/gadec-uk/departures-board
  *
@@ -17,18 +17,26 @@
 class weatherClient: public JsonListenerGS {
 
     private:
-        const char* apiHost = "api.openweathermap.org";
+        static const char* const apiHosts[];
+        enum weatherSources {
+            OPENWEATHERMAP = 0,
+            OPENMETEO = 1
+        } weatherSource;
+
         sharedBufferSpace* js = nullptr;
         int weatherItem = 0;
 
         float temperature;
         float windSpeed;
+        int weatherCode;
+
+        const char* getWeatherDescription(int code);
 
     public:
         char currentWeatherMessage[MAXWEATHERSIZE];
 
         weatherClient(sharedBufferSpace *sharedBuffer);
-        int updateWeather(String apiKey, String lat, String lon);
+        int updateWeather(const char *apiKey, float lat, float lon);
 
         virtual void whitespace(char c);
         virtual void startDocument();

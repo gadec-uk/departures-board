@@ -459,6 +459,7 @@ static bool isShowingCalling = false;
 static int currentMessage = 0;
 static int prevMessage = 0;
 static int prevScrollStopsLength = 0;
+static long delayMs;
 static char line2[5+MAXBOARDMESSAGES][MAXCALLINGSIZE+12];
 
 // Line 3 (additional services)
@@ -483,7 +484,7 @@ static unsigned long refreshTimer = 0;
 
 // Weather Stuff
 static unsigned long nextWeatherUpdate = 0;            // When the next weather update is due
-static String openWeatherMapApiKey = "";               // The API key to use
+static char openWeatherMapApiKey[33] = "";             // If no OWM API key is provided, we use Open-Meteo weather data
 
 // RSS Client
 static bool rssEnabled = false;                        // Add RSS feed to the messages
@@ -685,8 +686,8 @@ void drawSleepingScreen() {
     sprintf(sysTime,"%02d:%02d",timeinfo.tm_hour,timeinfo.tm_min);
     strftime(sysDate,29,"%d %B %Y",&timeinfo);
 
-    int offset = (getStringWidth(sysDate)-getStringWidth(sysTime))/2;
-    u8g2.setFont(NatRailTall12);
+    int offset = (getStringWidth(sysDate)-44)/2;
+    u8g2.setFont(NatRailClockLarge9);
     int y = random(39);
     int x = random(SCREEN_WIDTH-getStringWidth(sysDate));
     u8g2.drawStr(x+offset,y,sysTime);
@@ -1017,7 +1018,7 @@ void loadApiKeys() {
         }
 
         if (settings["owmToken"].is<const char*>()) {
-          openWeatherMapApiKey = settings["owmToken"].as<String>();
+          strlcpy(openWeatherMapApiKey, settings["owmToken"], sizeof(openWeatherMapApiKey));
         }
 
         if (settings["appKey"].is<const char*>()) {
@@ -1047,7 +1048,7 @@ void saveFirmwareInfo() {
 
 // Write a default config file so that the Web GUI works initially (force Tube mode if no NR token)
 void writeDefaultConfig() {
-  String defaultConfig = "{\"crs\":\"\",\"station\":\"\",\"lat\":0,\"lon\":0,\"weather\":" + String((openWeatherMapApiKey.length())?"true":"false") + ",\"sleep\":false,\"showDate\":false,\"showBus\":false,\"update\":true,\"sleepStarts\":23,\"sleepEnds\":8,\"brightness\":20,\"tubeId\":\"\",\"tubeName\":\"\",\"mode\":" + String((!nrToken[0] && rdmDeparturesApiKey=="")?"1":"0") + "}";
+  String defaultConfig = "{\"crs\":\"\",\"station\":\"\",\"lat\":0,\"lon\":0,\"weather\":true,\"sleep\":false,\"showDate\":false,\"showBus\":false,\"update\":true,\"sleepStarts\":23,\"sleepEnds\":8,\"brightness\":20,\"tubeId\":\"\",\"tubeName\":\"\",\"mode\":" + String((!nrToken[0] && rdmDeparturesApiKey=="")?"1":"0") + "}";
   saveFile("/config.json",defaultConfig);
   resetLocationIds();
   saveFirmwareInfo();
@@ -1171,8 +1172,7 @@ void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFI
         if (settings["sleep"].is<bool>())             sleepEnabled = settings["sleep"];
         if (settings["darkSleep"].is<bool>())         sleepClock = !settings["darkSleep"];
         if (settings["fastRefresh"].is<bool>())       apiRefreshRate = settings["fastRefresh"] ? FASTDATAUPDATEINTERVAL : DATAUPDATEINTERVAL;
-        if (settings["weather"].is<bool>() && openWeatherMapApiKey.length())
-                                                    weatherEnabled = settings["weather"];
+        if (settings["weather"].is<bool>())           weatherEnabled = settings["weather"];
         if (settings["update"].is<bool>())            firmwareUpdates = settings["update"];
         if (settings["updateDaily"].is<bool>())       dailyUpdateCheck = settings["updateDaily"];
         if (settings["sleepStarts"].is<int>())        sleepStarts = settings["sleepStarts"];
@@ -1336,7 +1336,7 @@ void updateCurrentWeather(float latitude, float longitude) {
   nextWeatherUpdate = millis() + WEATHERUPDATEINTERVAL;
   if (!latitude || !longitude) return; // No location co-ordinates
   weatherMsg[0]='\0';
-  lastWeatherUpdateResult = currentWeather.updateWeather(openWeatherMapApiKey, String(latitude), String(longitude));
+  lastWeatherUpdateResult = currentWeather.updateWeather(openWeatherMapApiKey, latitude, longitude);
   if (lastWeatherUpdateResult == UPD_SUCCESS) strlcpy(weatherMsg,currentWeather.currentWeatherMessage,MAXWEATHERSIZE);
 }
 
@@ -1354,6 +1354,7 @@ void softResetBoard(boardModes requestedMode) {
   String prevRssUrl = rssURL;
   float prevLat = locationLat;
   float prevLon = locationLon;
+  bool prevWeatherEnabled = weatherEnabled;
 
   // Reload the settings
   loadConfig(false,requestedMode);
@@ -1382,6 +1383,7 @@ void softResetBoard(boardModes requestedMode) {
   noDataLoaded=true;
   viaTimer=0;
   timer=0;
+  serviceTimer=0;
   prevProgressBarPosition=133;
   startupProgressPercent=70;
   currentMessage=0;
@@ -1393,6 +1395,11 @@ void softResetBoard(boardModes requestedMode) {
   fetchComplete=false;
   nextSchedulerCheck=millis()+10000;
   if (!weatherEnabled) weatherMsg[0]='\0';
+  else if (!prevWeatherEnabled) {
+    // force a weather update, even if the location hasn't changed
+    prevLat=0;
+    prevLon=0;
+  }
 
   if (rssEnabled && prevRssUrl != rssURL) {
     rssMessage[0] = '\0';
@@ -1740,7 +1747,6 @@ void drawStationBoard() {
     blankArea(0,LINE2,256,LINE4-LINE2);
     u8g2.setFont(NatRailTall12);
     centreText("There are no scheduled services at this station.",LINE1-1);
-    numMessages = messages.numMessages;
   }
 
   // Check if RSS should be inserted before nrcc messages
@@ -1914,7 +1920,7 @@ void drawUndergroundBoard() {
 
   // Check if RSS should be added after TfL messages
   if (rssEnabled && !rssPriority && rssMessage[0] && !noScrolling) {
-    strcpy(line2[numMessages++],rssMessage);
+    strcpy(line2[numMessages],rssMessage);
     numMessages++;
   }
 
@@ -2237,7 +2243,7 @@ void handleInfo(AsyncWebServerRequest *request) {
   sprintf(sysUptime,"%02d:%02d:%02d %02d/%02d/%04d",timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec,timeinfo.tm_mday,timeinfo.tm_mon+1,timeinfo.tm_year+1900);
   message+="\nSystem clock: " + String(sysUptime);
   if (ghUpdate.releaseId.length()) {
-    message+="\nGithub: " + ghUpdate.releaseId + " " + ghUpdate.firmwareURL;
+    message+="\nGithub: " + ghUpdate.releaseId;
   }
 
   if (schedulerActive) message+="\nScheduler active, next event at " + String(nextSlotEventTime);
@@ -2265,7 +2271,7 @@ void handleInfo(AsyncWebServerRequest *request) {
   message+="\nServices: " + String(station.numServices) + "\nMessages: ";
   int nMsgs = messages.numMessages;
   if (boardMode == MODE_TUBE) nMsgs--;
-  message+=String(nMsgs) + "\n\n";
+  message+=String(nMsgs) + "\n";
 
   if (rssEnabled) {
     message+="Last RSS result: " + getResultCodeText(lastRssUpdateResult) + "\nNext RSS update: " + String(nextRssUpdate-millis()) + "ms\n\n";
@@ -2605,7 +2611,7 @@ void departureBoardLoop() {
 
     // To ensure a consistent refresh rate (for smooth text scrolling), we update the screen every 25ms (around 40fps)
     // so we need to wait any additional ms not used by processing so far before sending the frame to the display controller
-    long delayMs = frameTimeRail - (millis()-refreshTimer);
+    delayMs = frameTimeRail - (millis()-refreshTimer);
     if (delayMs>0) delay(delayMs);
     u8g2.updateDisplayArea(0,3,32,4);
     refreshTimer=millis();
@@ -2645,8 +2651,9 @@ void undergroundArrivalsLoop() {
     fullRefresh = true;
   }
 
-  if (fetchComplete && lastUpdateResult != UPD_NO_CHANGE && !isScrollingService && !isScrollingPrimary && !isSleeping) {
+  if (fetchComplete && lastUpdateResult != UPD_NO_CHANGE && (!isScrollingService || !showFullMsgs) && !isScrollingPrimary && !isSleeping) {
     fetchComplete = false;
+    isScrollingService = false;
     // Get the updated data
     if (lastUpdateResult == UPD_SUCCESS) {
       updateArrivals();
@@ -2776,7 +2783,7 @@ void undergroundArrivalsLoop() {
     // Check if the clock should be updated
     drawCurrentTimeUG();
 
-    long delayMs = frameTimeTube - (millis()-refreshTimer);
+    delayMs = frameTimeTube - (millis()-refreshTimer);
     if (delayMs>0) delay(delayMs);
     if (fullRefresh) u8g2.updateDisplayArea(0,1,32,6); else u8g2.updateDisplayArea(0,5,32,2);
     refreshTimer=millis();
@@ -2921,7 +2928,7 @@ void busDeparturesLoop() {
     // just use the Tube clock for bus mode
     if (drawCurrentTimeUG()) u8g2.setFont(NatRailSmall9);
 
-    long delayMs = frameTimeBus - (millis()-refreshTimer);
+    delayMs = frameTimeBus - (millis()-refreshTimer);
     if (delayMs>0) delay(delayMs);
     if (fullRefresh) u8g2.updateDisplayArea(0,1,32,6); else u8g2.updateDisplayArea(0,5,32,2);
     refreshTimer=millis();
@@ -2961,7 +2968,7 @@ void fetchDeparturesTask(void *pvParameters) {
 
       case FETCH_WEATHER:
         // Update the weather forecast
-        lastWeatherUpdateResult = currentWeather.updateWeather(openWeatherMapApiKey, String(locationLat), String(locationLon));
+        lastWeatherUpdateResult = currentWeather.updateWeather(openWeatherMapApiKey, locationLat, locationLon);
         nextWeatherUpdate = millis() + WEATHERUPDATEINTERVAL; // update every 20 mins
         weatherFetchComplete = true;
         break;
@@ -3025,6 +3032,8 @@ void setup(void) {
   wm.setWiFiAutoReconnect(true);              // Attempt to auto-reconnect WiFi
   wm.setConnectTimeout(8);
   wm.setConnectRetries(2);
+  std::vector<const char *> menu = {"wifi","exit"};
+  wm.setMenu(menu);
 
   bool result = wm.autoConnect("Departures Board");    // Attempt to connect to WiFi (or enter interactive configuration mode)
   if (!result || wifiConfigured) {
@@ -3034,7 +3043,7 @@ void setup(void) {
 
   // Wait for WiFi connection
   while (WiFi.status() != WL_CONNECTED) {
-    delay(250);
+    delay(200);
   }
 
   // Get our IP address and store

@@ -37,7 +37,7 @@ A model railway (00 gauge) version of this project is also available [here](http
 3. A 3D printed case using the [STL](https://github.com/gadec-uk/departures-board/tree/main/stl) files provided. If you don't have a 3D printer, you can use a 3D print service, local library or group.
 4. Optionally, a TTP223 touch sensor (for easily switching modes / stations). For example, from [AliExpress](https://www.aliexpress.com/item/1005007850732859.html). If fitted, the touch sensor should be glued to the inside of one of the walls of the top part of the case with the *sensor* side against the case.
 5. For National Rail, the board supports using either the Rail Delivery Group feeds (recommended) or the legacy OpenLDBWS feed. Both feeds are free of charge and provide identical information but the legacy OpenLDBWS feed may be discontinued in the future. To use the Rail Delivery Group feeds, you will need a [Live Departure Board 1.1](https://raildata.org.uk/dataProduct/P-d81d6eaf-8060-4467-a339-1c833e50cbbe/overview) consumer key and (optionally) a [Service Details 1.1](https://raildata.org.uk/dataProduct/P-4dec1247-d040-4290-80a4-639dfac54a92/overview) consumer key. Alternatively, if you prefer to use the legacy OpenLDBWS feed, you can register for a token [here](https://realtime.nationalrail.co.uk/OpenLDBWSRegistration).
-6. Optionally, an OpenWeather Map API token to display weather conditions at the selected station (these are also free, sign-up for a free developer account [here](https://home.openweathermap.org/users/sign_up)).
+6. By default, weather data is sourced from Open-Meteo. If you prefer to use OpenWeather (which usually provides slightly more localised weather conditions) you will need an OpenWeather Map API token (these are also free, sign-up for a free developer account [here](https://home.openweathermap.org/users/sign_up)).
 7. Some intermediate soldering skills.
 
 A step-by-step guide to obtaining the API keys is available [here](https://departures-board.github.io/Departures-Board-API-Keys-Guide.pdf).
@@ -124,7 +124,7 @@ At start-up, the ESP32's IP address is displayed. To change the station or to co
 #### Options tab ####
 - **Brightness** - adjusts the brightness of the OLED screen.
 - **Show the date on screen** - displays the date in the upper-right corner (useful if you're also using this as a desk clock).
-- **Include current weather at station location** - this option requires a valid OpenWeather Map API key.
+- **Show current weather at station/bus stop** - optionally display weather conditions at the selected station or bus stop.
 - **Include bus replacement services** - optionally include bus replacement services (National Rail mode).
 - **Show station messages** - displays station and service messages (Rail and Tube modes).
 - **Show service location** - displays the current location of the next tube train that is due to arrive (Tube mode).

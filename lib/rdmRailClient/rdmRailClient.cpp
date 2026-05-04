@@ -168,7 +168,7 @@ void rdmRailClient::cleanFilter(const char* rawFilter, char* cleanedFilter, size
 
 
 //
-// Fetches the Departure Board data from the SOAP API
+// Fetches the Departure Board data
 //
 int rdmRailClient::fetchDepartures(rdStation *station, stnMessages *messages, const char *crsCode, String departuresApiKey, String serviceApiKey, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms, int timeOffset, bool fetchLastSeen, bool includeServiceMessages) {
 
@@ -583,14 +583,20 @@ void rdmRailClient::sanitiseData() {
     // first change any &lt; &gt;
     removeHtmlTags(xStation->service[i].destination);
     replaceWord(xStation->service[i].destination,"&amp;","&");
-    removeHtmlTags(xStation->service[i].calling);
-    replaceWord(xStation->service[i].calling,"&amp;","&");
     removeHtmlTags(xStation->service[i].via);
     replaceWord(xStation->service[i].via,"&amp;","&");
-    removeHtmlTags(xStation->service[i].serviceMessage);
-    replaceWord(xStation->service[i].serviceMessage,"&amp;","&");
-    replaceWord(xStation->service[i].serviceMessage,"&quot;","\"");
-    fixFullStop(xStation->service[i].serviceMessage);
+    if (i==0) {
+        removeHtmlTags(xStation->service[i].calling);
+        replaceWord(xStation->service[i].calling,"&amp;","&");
+        removeHtmlTags(xStation->service[i].opco);
+        replaceWord(xStation->service[i].opco,"&amp;","&");
+        removeHtmlTags(xStation->service[i].origin);
+        replaceWord(xStation->service[i].origin,"&amp;","&");
+        removeHtmlTags(xStation->service[i].serviceMessage);
+        replaceWord(xStation->service[i].serviceMessage,"&amp;","&");
+        replaceWord(xStation->service[i].serviceMessage,"&quot;","\"");
+        fixFullStop(xStation->service[i].serviceMessage);
+    }
   }
 
   for (int i=0;i<xMessages->numMessages;++i) {
