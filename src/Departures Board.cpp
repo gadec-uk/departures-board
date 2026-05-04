@@ -2167,7 +2167,7 @@ void handleCat(AsyncWebServerRequest *request) {
   if (request->hasParam("f")) {
     String filename = request->getParam("f")->value();
     handleStreamFile(filename,request);
-  } else sendResponse(404,"Not found",request);
+  } else sendResponse(404,"Not found: missing 'f' parameter",request);
 }
 
 // Delete a file from the file system
@@ -2181,7 +2181,7 @@ void handleDelete(AsyncWebServerRequest *request) {
       LOG_ERROR("FS", "Failed to delete file");
       sendResponse(400,"Failed to delete file",request);
     }
-  } else sendResponse(404,"Not found",request);
+  } else sendResponse(404,"Not found: missing 'f' parameter",request);
 }
 
 // Format the file system
@@ -2216,7 +2216,7 @@ void handleNotFound(AsyncWebServerRequest *request) {
   else if (request->url() == "/itube.webp") handleStreamFlashFile(request->url(), itube, sizeof(itube),request);
   else if (request->url() == "/favicon.png") handleStreamFlashFile(request->url(), faviconpng, sizeof(faviconpng),request);
   else if (request->url() == "/rss.json") handleStreamGzipFlashFile(request->url(), rssjson, sizeof(rssjson),request);
-  else sendResponse(404,"Not Found",request);
+  else sendResponse(404,"Not Found: " + request->url(),request);
 }
 
 String getResultCodeText(int resultCode) {
@@ -3020,6 +3020,7 @@ void fetchDeparturesTask(void *pvParameters) {
 //
 void setup(void) {
   LOG_BEGIN(115200);
+  LOG_WAIT_FOR_SERIAL(5000);   // 5 second timeout for the serial port to initalise for monitoring
   LOG_SPLASH("Booting Departures Board...");
 
   // These are the default wsdl XML SOAP entry points. They can be overridden in the config.json file if necessary
