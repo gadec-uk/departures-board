@@ -11,6 +11,7 @@
 
 #include <busDataClient.h>
 #include <WiFiClientSecure.h>
+#include <logger.hpp>
 
 busDataClient::busDataClient(busTubeStation *station, sharedBufferSpace *sharedBuffer) : xBusStop(station), js(sharedBuffer) {}
 
@@ -137,10 +138,13 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
         delay(200);
     }
     if (retryCounter>=10) {
+        LOG_ERROR("DATA", "Bus API Connect Timeout");
         strcpy(js->lastResultMessage,"Error: Connect timed out");
         return UPD_NO_RESPONSE;
     }
     String request = "GET /stops/" + String(locationId) + "/departures HTTP/1.0\r\nHost: " + String(apiHost) + "\r\nConnection: close\r\n\r\n";
+    LOG_INFOf("DATA", "Fetching Bus departures for %s...", locationId);
+    LOG_DEBUGf("DATA", "Request: %s", request.c_str());
     httpsClient.print(request);
     retryCounter=0;
     while(!httpsClient.available() && retryCounter++ < 40) {
@@ -150,23 +154,29 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
     if (!httpsClient.available()) {
         // no response within 8 seconds so exit
         httpsClient.stop();
+        LOG_ERROR("DATA", "Bus API GET Timeout");
         strcpy(js->lastResultMessage,"Error: GET timed out");
         return UPD_TIMEOUT;
     }
 
     // Parse status code
     String statusLine = httpsClient.readStringUntil('\n');
+    LOG_DEBUGf("DATA", "Response Status: %s", statusLine.c_str());
     if (!statusLine.startsWith("HTTP/") || statusLine.indexOf("200 OK") == -1) {
         httpsClient.stop();
         strlcpy(js->lastResultMessage,statusLine.c_str(),sizeof(js->lastResultMessage));
         if (statusLine.indexOf("401") > 0 || statusLine.indexOf("429") > 0) {
+            LOG_WARNf("DATA", "Bus API Unauthorized/Rate Limited: %s", statusLine.c_str());
             return UPD_UNAUTHORISED;
         } else if (statusLine.indexOf("500") > 0) {
+            LOG_ERRORf("DATA", "Bus API Data Error: %s", statusLine.c_str());
             return UPD_DATA_ERROR;
         } else {
+            LOG_ERRORf("DATA", "Bus API HTTP Error: %s", statusLine.c_str());
             return UPD_HTTP_ERROR;
         }
     }
+    LOG_INFO("DATA", "Bus API fetch successful (HTTP 200 OK)");
 
     // Skip the remaining headers
     while (httpsClient.connected() || httpsClient.available()) {
@@ -194,6 +204,9 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
     while((httpsClient.available() || httpsClient.connected()) && (millis() < dataSendTimeout) && (!maxServicesRead)) {
         while(httpsClient.available() && !maxServicesRead) {
             String line = httpsClient.readStringUntil('\n');
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+            LOG_DEBUGf("DATA", "Payload line: %s", line.c_str());
+#endif
             dataReceived+=line.length()+1;
             line.trim();
             if (line.length()) {
@@ -284,6 +297,7 @@ int busDataClient::fetchDepartures(rdStation *station, const char *locationId, c
 
     httpsClient.stop();
     if (millis() >= dataSendTimeout) {
+        LOG_ERRORf("DATA", "Bus API Receive Timeout after %d bytes", dataReceived);
         sprintf(js->lastResultMessage,"Error: Timeout after %d bytes",dataReceived);
         return UPD_TIMEOUT;
     }

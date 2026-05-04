@@ -15,6 +15,7 @@
 #include <WiFiClientSecure.h>
 #include <LittleFS.h>
 #include <md5Utils.h>
+#include <logger.hpp>
 
 github::github(sharedBufferSpace *sharedBuffer) : js(sharedBuffer) {}
 
@@ -35,6 +36,7 @@ int github::getLatestRelease() {
         retryCounter++;
     }
     if(retryCounter>=10) {
+        LOG_ERROR("DATA", "GitHub API Connect Timeout");
         strcpy(js->lastResultMessage,"Error: GH Connect timed out");
         return UPD_NO_RESPONSE;
     }
@@ -51,6 +53,7 @@ int github::getLatestRelease() {
         if (retryCounter > 25) {
             // no response within 5 seconds so quit
             httpsClient.stop();
+            LOG_ERROR("DATA", "GitHub API GET Timeout");
             strcpy(js->lastResultMessage,"Error: GH GET timed out");
             return UPD_TIMEOUT;
         }
@@ -97,6 +100,7 @@ int github::getLatestRelease() {
     }
     httpsClient.stop();
     if (millis() >= dataSendTimeout) {
+        LOG_ERRORf("DATA", "GitHub API Receive Timeout after %d bytes", dataReceived);
         sprintf(js->lastResultMessage,"Error: GH Timeout after %d bytes",dataReceived);
         return UPD_TIMEOUT;
     }

@@ -12,6 +12,7 @@
 #include <raildataXmlClient.h>
 #include <xmlListener.h>
 #include <WiFiClientSecure.h>
+#include <logger.hpp>
 
 raildataXmlClient::raildataXmlClient(rdiStation *station, stnMessages *messages, sharedBufferSpace *sharedBuffer) : xStation(station), xMessages(messages), js(sharedBuffer) {
     firstDataLoad=true;
@@ -51,6 +52,7 @@ int raildataXmlClient::init(const char *wsdlHost, const char *wsdlAPI)
         retryCounter++;
     }
     if(retryCounter>=10) {
+      LOG_ERROR("DATA", "Darwin API WSDL Connect Timeout");
       return UPD_NO_RESPONSE;   // No response within 3s
     }
 
@@ -64,6 +66,7 @@ int raildataXmlClient::init(const char *wsdlHost, const char *wsdlAPI)
         retryCounter++;
         if (retryCounter > 100) {
             httpsClient.stop();
+            LOG_ERROR("DATA", "Darwin API WSDL GET Timeout");
             return UPD_TIMEOUT;     // Timeout after 10s
         }
     }
@@ -302,6 +305,7 @@ int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages
         retryCounter++;
     }
     if(retryCounter>=10) {
+        LOG_ERROR("DATA", "Darwin API Connect Timeout");
         strcpy(js->lastResultMessage,"Error: Connect timed out");
         return UPD_NO_RESPONSE;
     }
@@ -317,6 +321,9 @@ int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages
     if (timeOffset) data += "<ns0:timeOffset>" + String(timeOffset) + "</ns0:timeOffset>";
     data += "</ns0:GetDepBoardWithDetailsRequest></soap-env:Body></soap-env:Envelope>";
 
+    LOG_INFOf("DATA", "Fetching Darwin Rail departures for %s...", crsCode);
+    LOG_DEBUGf("DATA", "Request URL: %s%s", soapHost, soapAPI);
+    LOG_DEBUGf("DATA", "Payload: %s", data.c_str());
     httpsClient.print("POST " + String(soapAPI) + " HTTP/1.1\r\n" +
       "Host: " + String(soapHost) + "\r\n" +
       "Content-Type: text/xml;charset=UTF-8\r\n" +
@@ -330,6 +337,7 @@ int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages
         retryCounter++;
         if (retryCounter >= 80) {
             httpsClient.stop();
+            LOG_ERROR("DATA", "Darwin API GET Timeout");
             strcpy(js->lastResultMessage,"Error: GET timed out");
             return UPD_TIMEOUT;     // No response within 8s
         }
@@ -340,17 +348,22 @@ int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages
         String line = httpsClient.readStringUntil('\n');
         // check for success code...
         if (line.startsWith("HTTP")) {
+            LOG_DEBUGf("DATA", "Response Status: %s", line.c_str());
             if (line.indexOf("200 OK") == -1) {
                 httpsClient.stop();
                 strlcpy(js->lastResultMessage,line.c_str(),sizeof(js->lastResultMessage));
                 if (line.indexOf("401") > 0) {
+                    LOG_WARNf("DATA", "Darwin API Unauthorized: %s", line.c_str());
                     return UPD_UNAUTHORISED;
                 } else if (line.indexOf("500") > 0) {
+                    LOG_ERRORf("DATA", "Darwin API Data Error: %s", line.c_str());
                     return UPD_DATA_ERROR;
                 } else {
+                    LOG_ERRORf("DATA", "Darwin API HTTP Error: %s", line.c_str());
                     return UPD_HTTP_ERROR;
                 }
             }
+            LOG_INFO("DATA", "Darwin API fetch successful (HTTP 200 OK)");
         } else if (line.startsWith("Transfer-Encoding:") && line.indexOf("chunked") >= 0) bChunked=true;
         if (line == "\r") {
             // Headers received
@@ -382,17 +395,35 @@ int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages
     char c;
     dataSendTimeout = millis() + 12000UL;
     perfTimer=millis(); // Reset the data load timer
+
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+    String debugPayload = "";
+#endif
+
     while((httpsClient.available() || httpsClient.connected()) && (millis() < dataSendTimeout)) {
         while (httpsClient.available()) {
             c = httpsClient.read();
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+            debugPayload += c;
+            if (debugPayload.length() >= 512) {
+                LOG_DEBUG("DATA", debugPayload.c_str());
+                debugPayload = "";
+            }
+#endif
             parser.parse(c);
             dataReceived++;
         }
         delay(5);
     }
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+    if (debugPayload.length() > 0) {
+        LOG_DEBUG("DATA", debugPayload.c_str());
+    }
+#endif
 
     httpsClient.stop();
     if (millis() >= dataSendTimeout) {
+        LOG_ERRORf("DATA", "Darwin API Receive Timeout after %d bytes", dataReceived);
         sprintf(js->lastResultMessage,"Error: Timeout after %d bytes",dataReceived);
         return UPD_TIMEOUT;
     }
@@ -542,6 +573,7 @@ int raildataXmlClient::getServiceDetails(const char *serviceID, const char *cust
         retryCounter++;
     }
     if(retryCounter>=10) {
+        LOG_ERROR("DATA", "Darwin API Service Detail Connect Timeout");
         strcpy(js->lastResultMessage,"[SD] Connect Timeout");
         return UPD_NO_RESPONSE;
     }
@@ -550,6 +582,9 @@ int raildataXmlClient::getServiceDetails(const char *serviceID, const char *cust
     data += String(customToken) + "</ns0:TokenValue></ns0:AccessToken></soap-env:Header><soap-env:Body><ns0:GetServiceDetailsRequest xmlns:ns0=\"http://thalesgroup.com/RTTI/2021-11-01/ldb/\"><ns0:serviceID>";
     data += String(serviceID) + "</ns0:serviceID></ns0:GetServiceDetailsRequest></soap-env:Body></soap-env:Envelope>";
 
+    LOG_INFOf("DATA", "Fetching Darwin Service Details for %s...", serviceID);
+    LOG_DEBUGf("DATA", "Request URL: %s%s", soapHost, soapAPI);
+    LOG_DEBUGf("DATA", "Payload: %s", data.c_str());
     httpsClient.print("POST " + String(soapAPI) + " HTTP/1.1\r\n" +
       "Host: " + String(soapHost) + "\r\n" +
       "Content-Type: text/xml;charset=UTF-8\r\n" +
@@ -563,6 +598,7 @@ int raildataXmlClient::getServiceDetails(const char *serviceID, const char *cust
         retryCounter++;
         if (retryCounter >= 80) {
             httpsClient.stop();
+            LOG_ERROR("DATA", "Darwin API Service Detail GET Timeout");
             strcpy(js->lastResultMessage,"[SD] GET Timeout");
             return UPD_TIMEOUT;     // No response within 8s
         }
@@ -573,19 +609,24 @@ int raildataXmlClient::getServiceDetails(const char *serviceID, const char *cust
         String line = httpsClient.readStringUntil('\n');
         // check for success code...
         if (line.startsWith("HTTP")) {
+            LOG_DEBUGf("DATA", "Response Status: %s", line.c_str());
             if (line.indexOf("200 OK") == -1) {
                 httpsClient.stop();
                 if (line.indexOf("401") > 0) {
+                    LOG_WARNf("DATA", "Darwin Service API Unauthorized: %s", line.c_str());
                     strcpy(js->lastResultMessage,"[SD] 401 Unauthorised ");
                     return UPD_UNAUTHORISED;
                 } else if (line.indexOf("500") > 0) {
+                    LOG_ERRORf("DATA", "Darwin Service API Data Error: %s", line.c_str());
                     strcpy(js->lastResultMessage,"[SD] 500 Data Error ");
                     return UPD_DATA_ERROR;
                 } else {
+                    LOG_ERRORf("DATA", "Darwin Service API HTTP Error: %s", line.c_str());
                     sprintf(js->lastResultMessage,"[SD] HTTP Error %.3s ",line);
                     return UPD_HTTP_ERROR;
                 }
             }
+            LOG_INFO("DATA", "Darwin Service API fetch successful (HTTP 200 OK)");
         } else if (line.startsWith("Transfer-Encoding:") && line.indexOf("chunked") >= 0) bChunked=true;
         if (line == "\r") {
             // Headers received
@@ -615,18 +656,36 @@ int raildataXmlClient::getServiceDetails(const char *serviceID, const char *cust
     char c;
     dataSendTimeout = millis() + 12000UL;
     perfTimer=millis(); // Reset the data load timer
+
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+    String debugPayload = "";
+#endif
+
     while((httpsClient.available() || httpsClient.connected()) && (millis() < dataSendTimeout)) {
         while (httpsClient.available()) {
             c = httpsClient.read();
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+            debugPayload += c;
+            if (debugPayload.length() >= 512) {
+                LOG_DEBUG("DATA", debugPayload.c_str());
+                debugPayload = "";
+            }
+#endif
             parser.parse(c);
             dataReceived++;
         }
         delay(5);
     }
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+    if (debugPayload.length() > 0) {
+        LOG_DEBUG("DATA", debugPayload.c_str());
+    }
+#endif
 
     httpsClient.stop();
 
     if (millis() >= dataSendTimeout) {
+        LOG_ERRORf("DATA", "Darwin API Service Detail Receive Timeout after %d bytes", dataReceived);
         sprintf(js->lastResultMessage,"[SD] Data timeout %d ",dataReceived);
         return UPD_TIMEOUT;
     }

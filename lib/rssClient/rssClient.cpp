@@ -14,6 +14,7 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <WiFiClient.h>
+#include <logger.hpp>
 
 rssClient::rssClient(sharedBufferSpace *sharedBuffer) : js(sharedBuffer) {}
 
@@ -50,8 +51,12 @@ int rssClient::loadFeed(String url) {
     while (redirectCount < maxRedirects) {
         if (url.startsWith("https")) http.begin(clientSecure,url);
         else http.begin(client, url);
+        LOG_INFOf("DATA", "Fetching RSS Feed from %s...", url.c_str());
+        LOG_DEBUGf("DATA", "Request URL: %s", url.c_str());
         int httpCode = http.GET();
+        LOG_DEBUGf("DATA", "Response Status Code: %d", httpCode);
         if (httpCode == HTTP_CODE_OK) {
+            LOG_INFO("DATA", "RSS fetch successful (HTTP 200 OK)");
             WiFiClient *stream = http.getStreamPtr();
             xmlStreamingParser parser;
             parser.setListener(this);
@@ -64,17 +69,34 @@ int rssClient::loadFeed(String url) {
             char c;
             unsigned long dataSendTimeout = millis() + 3000UL;
 
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+            String debugPayload = "";
+#endif
+
             while((stream->available() || http.connected()) && millis() < dataSendTimeout && numRssTitles < MAX_RSS_TITLES) {
                 while (stream->available() && numRssTitles < MAX_RSS_TITLES) {
                     c = stream->read();
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+                    debugPayload += c;
+                    if (debugPayload.length() >= 512) {
+                        LOG_DEBUG("DATA", debugPayload.c_str());
+                        debugPayload = "";
+                    }
+#endif
                     parser.parse(c);
                     dataReceived++;
                 }
                 delay(1);
             }
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+            if (debugPayload.length() > 0) {
+                LOG_DEBUG("DATA", debugPayload.c_str());
+            }
+#endif
 
             http.end();
             if (millis() >= dataSendTimeout) {
+                LOG_ERRORf("DATA", "RSS Feed API Receive Timeout after %d bytes", dataReceived);
                 return UPD_TIMEOUT;
             }
             return UPD_SUCCESS;
@@ -93,6 +115,7 @@ int rssClient::loadFeed(String url) {
             url = newUrl;
             redirectCount++;
         } else {
+            LOG_ERRORf("DATA", "RSS API HTTP Error: %d", httpCode);
             http.end();
             return UPD_HTTP_ERROR;
             break;

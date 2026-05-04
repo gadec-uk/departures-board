@@ -12,6 +12,7 @@
 #include <TfLdataClient.h>
 #include <JsonListenerGS.h>
 #include <WiFiClientSecure.h>
+#include <logger.hpp>
 
 TfLdataClient::TfLdataClient(busTubeStation *station, stnMessages *messages,  sharedBufferSpace *sharedBuffer) : xStation(station), xMessages(messages), js(sharedBuffer) {}
 
@@ -36,6 +37,7 @@ int TfLdataClient::fetchArrivals(rdStation *station, stnMessages *messages, cons
         delay(200);
     }
     if (retryCounter>=15) {
+        LOG_ERROR("DATA", "TfL API Connect Timeout");
         strcpy(js->lastResultMessage,"Error: Connect timed out");
         return UPD_NO_RESPONSE;
     }
@@ -47,6 +49,8 @@ int TfLdataClient::fetchArrivals(rdStation *station, stnMessages *messages, cons
     } else {
         request="GET /StopPoint/" + String(locationId) + "/Arrivals?app_key=" + apiKey + " HTTP/1.0\r\nHost: " + String(apiHost) + "\r\nConnection: close\r\n\r\n";
     }
+    LOG_INFOf("DATA", "Fetching TfL Arrivals for %s...", locationId);
+    LOG_DEBUGf("DATA", "Request: %s", request.c_str());
     httpsClient.print(request);
     retryCounter=0;
     while(!httpsClient.available() && retryCounter++ < 40) {
@@ -56,23 +60,29 @@ int TfLdataClient::fetchArrivals(rdStation *station, stnMessages *messages, cons
     if (!httpsClient.available()) {
         // no response within 8 seconds so exit
         httpsClient.stop();
+        LOG_ERROR("DATA", "TfL API GET Timeout");
         strcpy(js->lastResultMessage,"Error: GET timed out");
         return UPD_TIMEOUT;
     }
 
     // Parse status code
     String statusLine = httpsClient.readStringUntil('\n');
+    LOG_DEBUGf("DATA", "Response Status: %s", statusLine.c_str());
     if (!statusLine.startsWith("HTTP/") || statusLine.indexOf("200 OK") == -1) {
         httpsClient.stop();
         strlcpy(js->lastResultMessage,statusLine.c_str(),sizeof(js->lastResultMessage));
         if (statusLine.indexOf("401") > 0 || statusLine.indexOf("429") > 0) {
+            LOG_WARNf("DATA", "TfL API Unauthorized/Rate Limited: %s", statusLine.c_str());
             return UPD_UNAUTHORISED;
         } else if (statusLine.indexOf("500") > 0) {
+            LOG_ERRORf("DATA", "TfL API Data Error: %s", statusLine.c_str());
             return UPD_DATA_ERROR;
         } else {
+            LOG_ERRORf("DATA", "TfL API HTTP Error: %s", statusLine.c_str());
             return UPD_HTTP_ERROR;
         }
     }
+    LOG_INFO("DATA", "TfL API fetch successful (HTTP 200 OK)");
 
     // Skip the remaining headers
     while (httpsClient.connected() || httpsClient.available()) {
@@ -92,17 +102,37 @@ int TfLdataClient::fetchArrivals(rdStation *station, stnMessages *messages, cons
     for (int i=0;i<MAXTUBEBUSREADSERVICES;i++) strcpy(xStation->service[i].destinationName,"Check front of Train");
 
     unsigned long dataSendTimeout = millis() + 10000UL;
+    
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+    String debugPayload = "";
+#endif
+
     while((httpsClient.available() || httpsClient.connected()) && (millis() < dataSendTimeout) && (!maxServicesRead)) {
         while(httpsClient.available() && !maxServicesRead) {
             c = httpsClient.read();
             dataReceived++;
             if (c == '{' || c == '[') isBody = true;
-            if (isBody) parser.parse(c);
+            if (isBody) {
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+                debugPayload += c;
+                if (debugPayload.length() >= 512) {
+                    LOG_DEBUG("DATA", debugPayload.c_str());
+                    debugPayload = "";
+                }
+#endif
+                parser.parse(c);
+            }
         }
         delay(5);
     }
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+    if (debugPayload.length() > 0) {
+        LOG_DEBUG("DATA", debugPayload.c_str());
+    }
+#endif
     httpsClient.stop();
     if (millis() >= dataSendTimeout) {
+        LOG_ERRORf("DATA", "TfL API Receive Timeout after %d bytes", dataReceived);
         sprintf(js->lastResultMessage,"Error: Timeout after %d bytes",dataReceived);
         return UPD_TIMEOUT;
     }
@@ -114,10 +144,13 @@ int TfLdataClient::fetchArrivals(rdStation *station, stnMessages *messages, cons
             delay(200);
         }
         if (retryCounter>=15) {
+            LOG_ERROR("DATA", "TfL API Disruption Connect Timeout");
             strcpy(js->lastResultMessage,"Error: Connect timed out [Msgs]");
             return UPD_NO_RESPONSE;
         }
         request = "GET /StopPoint/" + String(locationId) + "/Disruption?getFamily=true&flattenResponse=true&app_key=" + String(apiKey) + " HTTP/1.0\r\nHost: " + String(apiHost) + "\r\nConnection: close\r\n\r\n";
+        LOG_INFOf("DATA", "Fetching TfL Disruption Messages for %s...", locationId);
+        LOG_DEBUGf("DATA", "Request: %s", request.c_str());
         httpsClient.print(request);
         retryCounter=0;
         while(!httpsClient.available() && retryCounter++ < 40) {
@@ -127,23 +160,29 @@ int TfLdataClient::fetchArrivals(rdStation *station, stnMessages *messages, cons
         if (!httpsClient.available()) {
             // no response within 8 seconds so exit
             httpsClient.stop();
+            LOG_ERROR("DATA", "TfL API Disruption GET Timeout");
             strcpy(js->lastResultMessage,"Error: GET timed out [Msgs]");
             return UPD_TIMEOUT;
         }
 
         // Parse status code
         statusLine = httpsClient.readStringUntil('\n');
+        LOG_DEBUGf("DATA", "Response Status: %s", statusLine.c_str());
         if (!statusLine.startsWith("HTTP/") || statusLine.indexOf("200 OK") == -1) {
             httpsClient.stop();
             strlcpy(js->lastResultMessage,statusLine.c_str(),sizeof(js->lastResultMessage));
             if (statusLine.indexOf("401") > 0) {
+                LOG_WARNf("DATA", "TfL API Unauthorized: %s", statusLine.c_str());
                 return UPD_UNAUTHORISED;
             } else if (statusLine.indexOf("500") > 0) {
+                LOG_ERRORf("DATA", "TfL API Data Error: %s", statusLine.c_str());
                 return UPD_DATA_ERROR;
             } else {
+                LOG_ERRORf("DATA", "TfL API HTTP Error: %s", statusLine.c_str());
                 return UPD_HTTP_ERROR;
             }
         }
+        LOG_INFO("DATA", "TfL API Disruption fetch successful (HTTP 200 OK)");
 
         // Skip the remaining headers
         while (httpsClient.connected() || httpsClient.available()) {
@@ -159,17 +198,37 @@ int TfLdataClient::fetchArrivals(rdStation *station, stnMessages *messages, cons
         parser.reset();
 
         dataSendTimeout = millis() + 10000UL;
+        
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+        String debugPayload = "";
+#endif
+
         while((httpsClient.available() || httpsClient.connected()) && (millis() < dataSendTimeout) && (!maxServicesRead)) {
             while(httpsClient.available() && !maxServicesRead) {
                 c = httpsClient.read();
                 dataReceived++;
                 if (c == '{' || c == '[') isBody = true;
-                if (isBody) parser.parse(c);
+                if (isBody) {
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+                    debugPayload += c;
+                    if (debugPayload.length() >= 512) {
+                        LOG_DEBUG("DATA", debugPayload.c_str());
+                        debugPayload = "";
+                    }
+#endif
+                    parser.parse(c);
+                }
             }
             delay(5);
         }
+#if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_DEBUG
+        if (debugPayload.length() > 0) {
+            LOG_DEBUG("DATA", debugPayload.c_str());
+        }
+#endif
         httpsClient.stop();
         if (millis() >= dataSendTimeout) {
+            LOG_ERRORf("DATA", "TfL API Disruption Receive Timeout after %d bytes", dataReceived);
             sprintf(js->lastResultMessage,"Error: Timeout after %d bytes [Msgs]",dataReceived);
             return UPD_TIMEOUT;
         }

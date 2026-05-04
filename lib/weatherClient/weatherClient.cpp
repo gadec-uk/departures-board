@@ -12,6 +12,7 @@
 #include <weatherClient.h>
 #include <JsonListenerGS.h>
 #include <WiFiClientSecure.h>
+#include <logger.hpp>
 
 const char* const weatherClient::apiHosts[] = {
     "api.openweathermap.org",
@@ -40,6 +41,7 @@ int weatherClient::updateWeather(const char *apiKey, float lat, float lon) {
         delay(200);
     }
     if (retryCounter>=15) {
+        LOG_ERROR("DATA", "Weather API Connect Timeout");
         return UPD_NO_RESPONSE;
     }
 
@@ -58,6 +60,7 @@ int weatherClient::updateWeather(const char *apiKey, float lat, float lon) {
     if (!httpsClient.available()) {
         // no response within 8 seconds so exit
         httpsClient.stop();
+        LOG_ERROR("DATA", "Weather API GET Timeout");
         return UPD_TIMEOUT;
     }
 
@@ -99,6 +102,7 @@ int weatherClient::updateWeather(const char *apiKey, float lat, float lon) {
     }
     httpsClient.stop();
     if (millis() >= dataSendTimeout) {
+        LOG_ERROR("DATA", "Weather API Receive Timeout");
         return UPD_TIMEOUT;
     }
 

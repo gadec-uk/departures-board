@@ -2178,7 +2178,6 @@ void handleDelete(AsyncWebServerRequest *request) {
       // Successfully removed go back to directory listing
       request->redirect("/dir");
     } else {
-      LOG_ERROR("FS", "Failed to delete file");
       sendResponse(400,"Failed to delete file",request);
     }
   } else sendResponse(404,"Not found: missing 'f' parameter",request);
@@ -3169,7 +3168,6 @@ void setup(void) {
       DeserializationError error = deserializeJson(doc, body->c_str());
       if (!error) {
         if (!saveFile("/apikeys.json", body->c_str())) {
-          LOG_ERROR("FS", "Failed to save the API keys to the file system (file system corrupt or full?)");
           msg = "Failed to save the API keys to the file system (file system corrupt or full?)";
           result = false;
         } else {
@@ -3180,7 +3178,6 @@ void setup(void) {
         }
       } else {
         msg = "Invalid JSON format. No changes have been saved.";
-        LOG_WARN("CONFIG", "Invalid JSON format received for API keys.");
         result = false;
       }
 
@@ -3283,7 +3280,6 @@ void setup(void) {
       LOG_SPLASH("Entering OTA mode (Web Update)");
       // UPDATE_SIZE_UNKNOWN tells the library to just accept chunks until 'final' is true
       if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
-        LOG_ERROR("UPDATE", "Update begin failed");
         sendResponse(500,"Update begin failed",request);
       }
     }
@@ -3291,7 +3287,6 @@ void setup(void) {
     // Write chunk data to the flash memory
     if (!Update.hasError() && len) {
       if (Update.write(data, len) != len) {
-        LOG_ERROR("UPDATE", "Update write failed");
         sendResponse(500,"Update write failed",request);
       }
     }
@@ -3299,7 +3294,6 @@ void setup(void) {
     // Final chunk: Close the OTA process
     if (final) {
       if (!Update.end(true)) {
-        LOG_ERROR("UPDATE", "Update end failed");
         sendResponse(500,"Update end failed",request);
       }
     }
@@ -3426,6 +3420,7 @@ void loop(void) {
   if (touchEnabled) button.updateTouchState();
 
   if (button.wasShortTapped()) {
+    LOG_INFO("SYSTEM", "Hardware Button Short Tap Detected");
     if (isSleeping) {
       // force awake
       forcedAwake = true;
