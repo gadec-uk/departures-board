@@ -56,13 +56,13 @@
 #define LOG_ERRORf(sub, fmt, ...) Logger::_errorf(sub, fmt, ##__VA_ARGS__)
 #define LOG_BEGIN(baud) Logger::begin(baud)
 #define LOG_REGISTER_SECRET(secret) Logger::registerSecret(secret)
-#define WAIT_FOR_SERIAL(timeout_ms) Logger::waitForSerial(timeout_ms)
+#define LOG_WAIT_FOR_SERIAL(timeout_ms) Logger::waitForSerial(timeout_ms)
 #else
 #define LOG_ERROR(sub, msg)
 #define LOG_ERRORf(sub, fmt, ...)
 #define LOG_BEGIN(baud)
 #define LOG_REGISTER_SECRET(secret)
-#define WAIT_FOR_SERIAL(timeout_ms)
+#define LOG_WAIT_FOR_SERIAL(timeout_ms)
 #endif
 
 #if APP_DEBUG_LEVEL >= APP_LOG_LEVEL_WARN
