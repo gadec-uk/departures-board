@@ -728,6 +728,7 @@ void showSetupScreen() {
 }
 
 void showNoDataScreen() {
+  LOG_WARN("DATA", "No data available for the selected location.");
   u8g2.clearBuffer();
   char msg[60];
   u8g2.setFont(NatRailTall12);
@@ -777,6 +778,7 @@ void showSetupCrsHelpScreen() {
 }
 
 void showWsdlFailureScreen() {
+  LOG_ERROR("SYSTEM", "The National Rail data feed is unavailable.");
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
   centreText("The National Rail data feed is unavailable.",-1);
@@ -788,6 +790,7 @@ void showWsdlFailureScreen() {
 }
 
 void showTokenErrorScreen() {
+  LOG_ERROR("AUTH", "Access to the data feed denied.");
   char msg[60];
   u8g2.clearBuffer();
   u8g2.setFont(NatRailTall12);
@@ -816,6 +819,7 @@ void showTokenErrorScreen() {
 }
 
 void showCRSErrorScreen() {
+  LOG_ERROR("DATA", "The station or ATCO code is not valid.");
   u8g2.clearBuffer();
   char msg[60];
   u8g2.setFont(NatRailTall12);
@@ -1028,6 +1032,7 @@ void loadApiKeys() {
         apiKeys = true;
 
       } else {
+        LOG_ERROR("CONFIG", "JSON deserialization failed");
         // JSON deserialization failed - TODO
       }
       file.close();
@@ -1301,6 +1306,7 @@ void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFI
           loadSlot(settings,true,requestedMode);
         }
       } else {
+        LOG_ERROR("CONFIG", "JSON deserialization failed");
         // JSON deserialization failed - TODO
       }
       file.close();
@@ -1328,8 +1334,10 @@ void updateRssFeed() {
   if (lastRssUpdateResult=rss.loadFeed(rssURL); lastRssUpdateResult == UPD_SUCCESS) {
     nextRssUpdate = millis() + RSSUPDATEINTERVAL; // update every ten minutes
     buildRssMessage();
+  } else {
+    LOG_WARN("RSS", "Feed update failed, retrying in 5 minutes");
+    nextRssUpdate = millis() + (RSSUPDATEINTERVAL/2); // Failed so try again in 5 minutes
   }
-  else nextRssUpdate = millis() + (RSSUPDATEINTERVAL/2); // Failed so try again in 5 minutes
 }
 
 // Update the current weather message if weather updates are enabled and we have a lat/lon for the selected location
@@ -1512,10 +1520,11 @@ bool checkForFirmwareUpdate() {
   httpUpdate.rebootOnUpdate(false); // Don't auto reboot, we'll handle it
 
   HTTPUpdateResult ret = httpUpdate.handleUpdate(client, ghUpdate.firmwareURL);
+  char msg[60];
   const char* msgTitle = "Firmware Update";
   switch (ret) {
     case HTTP_UPDATE_FAILED:
-      char msg[60];
+      LOG_ERRORf("UPDATE", "The update failed with error %d", httpUpdate.getLastError());
       sprintf(msg,"The update failed with error %d.",httpUpdate.getLastError());
       result=false;
       for (int i=20;i>=0;i--) {
@@ -2121,6 +2130,7 @@ void handleFileList(AsyncWebServerRequest *request) {
 
   String output="<html><body style=\"font-family:Helvetica,Arial,sans-serif\"><h2>Departures Board File System</h2>";
   if (!root) {
+    LOG_ERROR("FS", "Failed to open directory");
     output+="<p>Failed to open directory</p>";
   } else if (!root.isDirectory()) {
     output+="<p>Not a directory</p>";
@@ -2158,7 +2168,10 @@ void handleDelete(AsyncWebServerRequest *request) {
     if (LittleFS.remove(filename)) {
       // Successfully removed go back to directory listing
       request->redirect("/dir");
-    } else sendResponse(400,"Failed to delete file",request);
+    } else {
+      LOG_ERROR("FS", "Failed to delete file");
+      sendResponse(400,"Failed to delete file",request);
+    }
   } else sendResponse(404,"Not found",request);
 }
 
@@ -2352,6 +2365,7 @@ void doManualOtaCheck() {
     checkForFirmwareUpdate();
   } else {
     for (int i=15;i>=0;i--) {
+      LOG_ERROR("UPDATE", "Firmware Update Check Failed: Unable to retrieve latest release information.");
       showUpdateCompleteScreen("Firmware Update Check Failed","Unable to retrieve latest release information.",jsonKeyBuffer.lastResultMessage,"",i,false);
       delay(1000);
     }
@@ -3136,6 +3150,7 @@ void setup(void) {
       DeserializationError error = deserializeJson(doc, body->c_str());
       if (!error) {
         if (!saveFile("/apikeys.json", body->c_str())) {
+          LOG_ERROR("FS", "Failed to save the API keys to the file system (file system corrupt or full?)");
           msg = "Failed to save the API keys to the file system (file system corrupt or full?)";
           result = false;
         } else {
@@ -3248,6 +3263,7 @@ void setup(void) {
       LOG_SPLASH("Entering OTA mode (Web Update)");
       // UPDATE_SIZE_UNKNOWN tells the library to just accept chunks until 'final' is true
       if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
+        LOG_ERROR("UPDATE", "Update begin failed");
         sendResponse(500,"Update begin failed",request);
       }
     }
@@ -3255,6 +3271,7 @@ void setup(void) {
     // Write chunk data to the flash memory
     if (!Update.hasError() && len) {
       if (Update.write(data, len) != len) {
+        LOG_ERROR("UPDATE", "Update write failed");
         sendResponse(500,"Update write failed",request);
       }
     }
@@ -3262,6 +3279,7 @@ void setup(void) {
     // Final chunk: Close the OTA process
     if (final) {
       if (!Update.end(true)) {
+        LOG_ERROR("UPDATE", "Update end failed");
         sendResponse(500,"Update end failed",request);
       }
     }
@@ -3276,6 +3294,7 @@ void setup(void) {
       checkForFirmwareUpdate();
     } else {
       for (int i=15;i>=0;i--) {
+        LOG_ERROR("UPDATE", "Firmware Update Check Failed: Unable to retrieve latest release information.");
         showUpdateCompleteScreen("Firmware Update Check Failed","Unable to retrieve latest release information.",jsonKeyBuffer.lastResultMessage,"",i,false);
         delay(1000);
       }
@@ -3315,6 +3334,7 @@ void setup(void) {
   }
   if (!ntpResult) {
     // Sometimes NTP/UDP fails. A reboot usually fixes it.
+    LOG_ERROR("SYSTEM", "Failed to set the clock. Rebooting in 5 sec.");
     progressBar("Failed to set the clock. Rebooting in 5 sec.",0);
     delay(5000);
     ESP.restart();

@@ -7,3 +7,4 @@
 
 # Generated Web Headers
 include/webgui/
+!include/webgui/webgraphics.h
