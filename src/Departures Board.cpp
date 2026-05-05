@@ -1012,22 +1012,27 @@ void loadApiKeys() {
 
         if (settings["rdmDepKey"].is<const char*>()) {
           rdmDeparturesApiKey = settings["rdmDepKey"].as<String>();
+          if (rdmDeparturesApiKey.length() > 0) LOG_REGISTER_SECRET(rdmDeparturesApiKey);
         }
 
         if (settings["rdmSvcKey"].is<const char*>()) {
           rdmServiceApiKey = settings["rdmSvcKey"].as<String>();
+          if (rdmServiceApiKey.length() > 0) LOG_REGISTER_SECRET(rdmServiceApiKey);
         }
 
         if (settings["nrToken"].is<const char*>()) {
           strlcpy(nrToken, settings["nrToken"], sizeof(nrToken));
+          if (strlen(nrToken) > 0) LOG_REGISTER_SECRET(String(nrToken));
         }
 
         if (settings["owmToken"].is<const char*>()) {
           strlcpy(openWeatherMapApiKey, settings["owmToken"], sizeof(openWeatherMapApiKey));
+          if (strlen(openWeatherMapApiKey) > 0) LOG_REGISTER_SECRET(String(openWeatherMapApiKey));
         }
 
         if (settings["appKey"].is<const char*>()) {
           strlcpy(tflAppKey,settings["appKey"],sizeof(tflAppKey));
+          if (strlen(tflAppKey) > 0) LOG_REGISTER_SECRET(String(tflAppKey));
         }
         apiKeys = true;
 
