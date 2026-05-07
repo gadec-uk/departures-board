@@ -1200,8 +1200,10 @@ void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFI
         if (rssURL != "") rssEnabled = true; else rssEnabled = false;
         if (settings["rssPriority"].is<bool>())       rssPriority = settings["rssPriority"];
 
-        if (settings[F("mode")].is<int>())            boardMode = settings[F("mode")];
-        else if (settings[F("tube")].is<bool>())      boardMode = settings[F("tube")] ? MODE_TUBE : MODE_RAIL; // handle legacy v1.x config
+        if (requestedMode != MODE_NEXTMODE) {
+          if (settings[F("mode")].is<int>())            boardMode = settings[F("mode")];
+          else if (settings[F("tube")].is<bool>())      boardMode = settings[F("tube")] ? MODE_TUBE : MODE_RAIL; // handle legacy v1.x config
+        }
 
         if (settings["dataSource"].is<int>())         useRDMclient = (settings["dataSource"]?1:0);
         // validate the data source against which api keys are available
