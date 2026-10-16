@@ -47,6 +47,8 @@ class rdmRailClient: public JsonListenerGS {
         bool addedStopLocation = false;
         int id=0;
         int coaches=0;
+        int numStoppingPoints=0;
+        bool serviceArrived = false;
 
         bool firstDataLoad;
         bool endXml;

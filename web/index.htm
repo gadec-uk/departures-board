@@ -204,9 +204,21 @@
           <div class="tab-content" style="padding-top:20px;">
             <div class="tab-pane fade show active" id="optionsTab" role="tabpanel" aria-labelledby="options-tab">
               <div class="mb-3">
-                <label class="form-label" for="brightness">Brightness</label>
+                <label class="form-label" for="brightness">Day time brightness</label>
                 <input type="range" min="1" max="255" value="50" class="form-range" id="brightness">
-                <div class="form-text">Lowering the brightness will help prevent burn-in.</div>
+                <label class="form-label" for="brightnessNight">Night time brightness</label>
+                <input type="range" min="1" max="255" value="50" class="form-range" id="brightnessNight">
+
+                <div style="display:flex;gap:10px;">
+                  <div style="flex:1;">
+                    <label class="form-label" for="dayTime">Day time</label>
+                    <input type="time" class="form-control" id="dayTime" required>
+                  </div>
+                  <div style="flex:1;">
+                    <label class="form-label" for="nightTime">Night time</label>
+                    <input type="time" class="form-control" id="nightTime" required>
+                  </div>
+                </div>
               </div>
 
               <div class="mb-3">
@@ -356,8 +368,20 @@
                   </div>
                 </div>
 
+                <div id="optMaxRailServices" style="display:none">
+                  <hr class="mt-0 mb-2 opacity-10">
+                  <div class="d-flex align-items-center">
+                    <label class="form-label mb-0" for="maxRailServices">Maximum rail services to show:</label>
+                    <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right"
+                      title="Limit the number of rail services that the board will cycle through."
+                      style="cursor:pointer;"></i>
+                    <select id="maxRailServices" class="form-select ms-auto w-auto">
+                    </select>
+                  </div>
+                </div>
+
                 <div id="optShowClockNoServices" style="display:none">
-                  <hr class="my-0 opacity-10">
+                  <hr class="mt-2 mb-0 opacity-10">
                   <div class="py-3">
                     <div class="d-flex justify-content-between align-items-center">
                       <div>
@@ -404,7 +428,7 @@
                 <div class="py-3">
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
-                      <label class="form-check-label d-block" for="enableSleep">Overnight sleep mode (screensaver)</label>
+                      <label class="form-check-label d-block" for="enableSleep">Schedule sleep mode (screensaver)</label>
                     </div>
                     <div class="form-check form-switch mb-0">
                       <input class="form-check-input" type="checkbox" id="enableSleep" role="switch">
@@ -415,14 +439,12 @@
                 <div id="sleepTimeSelectors" style="display:none">
                   <div style="display:flex;gap:10px;">
                     <div style="flex:1;">
-                      <label class="form-label" for="sleepStart">Sleep start hour</label>
-                      <select id="sleepStart" class="form-select">
-                      </select>
+                      <label class="form-label" for="sleepStart">Sleep start time</label>
+                      <input type="time" class="form-control" id="sleepStart" required>
                     </div>
                     <div style="flex:1;">
-                      <label class="form-label" for="sleepEnd">Sleep end hour</label>
-                      <select id="sleepEnd" class="form-select">
-                      </select>
+                      <label class="form-label" for="sleepEnd">Sleep end time</label>
+                      <input type="time" class="form-control" id="sleepEnd" required>
                     </div>
                   </div>
                   <hr class="mb-0 opacity-10">
@@ -577,7 +599,7 @@
                 </div>
 
                 <div class="mb-2" id="customTZbox" style="display:none;">
-                  <input id="customTZ" type="text" maxlength="24"
+                  <input id="customTZ" type="text" maxlength="75"
                     placeholder="Enter the POSIX time zone string or leave blank for UK" class="form-control">
                   <div class="form-text">Enter the exact POSIX time zone. Tap <a
                       href="https://github.com/gadec-uk/departures-board/#custom-time-zones" target="_blank">here</a> for
@@ -751,8 +773,8 @@
         </div>
         <div class="modal-body">
           <label for="carouselDuration" class="form-label">Show this location for:</label>
-          <select id="carouselDuration" class="form-select"><option value="3">3 minutes</option>
-            </select>
+          <select id="carouselDuration" class="form-select"><option value="1">1 minute</option><option value="3">3 minutes</option>
+          </select>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -818,6 +840,9 @@
       callingStation: document.getElementById("callingStation"),
       platformFilter: document.getElementById("platformFilter"),
       brightness: document.getElementById("brightness"),
+      brightnessNight: document.getElementById("brightnessNight"),
+      dayTime: document.getElementById("dayTime"),
+      nightTime: document.getElementById("nightTime"),
       enableSleep: document.getElementById("enableSleep"),
       sleepStart: document.getElementById("sleepStart"),
       sleepEnd: document.getElementById("sleepEnd"),
@@ -846,7 +871,8 @@
       schedulerListContainer: document.getElementById("schedulerListContainer"),
       carouselListContainer: document.getElementById("carouselListContainer"),
       enableScheduler: document.getElementById('enableScheduler'),
-      enableCarousel: document.getElementById('enableCarousel')
+      enableCarousel: document.getElementById('enableCarousel'),
+      maxRailServices: document.getElementById('maxRailServices')
     };
 
     document.getElementById('formsettings').addEventListener('keydown', function(e) { if (e.key === 'Enter') e.preventDefault(); });
@@ -887,14 +913,14 @@
       }
     }
 
-    function populateHoursSelect(selectId) {
-      const select = document.getElementById(selectId);
+    function populateMaxRailServicesSelect() {
+      const select = elements.maxRailServices;
       if (!select) return;
       select.innerHTML = "";
-      for (let hour = 0; hour < 24; hour++) {
+      for (let service = 3; service < 10; service++) {
         const option = document.createElement("option");
-        option.value = hour;
-        option.textContent = String(hour).padStart(2, "0") + ":00";
+        option.value = service;
+        option.textContent = String(service);
         select.appendChild(option);
       }
     }
@@ -941,8 +967,7 @@
 
     populateSchedulerTimes();
     populateCarouselTimes();
-    populateHoursSelect("sleepStart");
-    populateHoursSelect("sleepEnd");
+    populateMaxRailServicesSelect();
     populateOffsetTime("nrTimeOffset");
 
     function enableSave(isAllowed) {
@@ -1270,6 +1295,7 @@
     elements.enableSleep.addEventListener("change", toggleSleepSelectors);
     elements.darkSleep.addEventListener("change", () => { show("optSleepUseBigClock", !isChecked("darkSleep"));})
     elements.brightness.addEventListener("change", handleBrightnessChange);
+    elements.brightnessNight.addEventListener("change", handleBrightnessChange);
     elements.clearButton.addEventListener("click", handleClearFilter);
     elements.verifyAtcoButton.addEventListener("click", handleVerifyAtco);
     elements.clearHistoryButton.addEventListener("click", handleClearHistory);
@@ -1578,6 +1604,7 @@
       show("optShowFullCalling",rail);
       show("optShowFullMsgs", rail || tube);
       show("optShowClockNoServices", rail);
+      show("optMaxRailServices", rail);
       show("optFastRefresh", rail);
       show("optNoScroll", rail || tube);
       show("optRssFeed", rail || tube);
@@ -1787,8 +1814,14 @@
       elements.busAtco.value = appState.busId;
       elements.busFilter.value = appState.busFilter;
       elements.brightness.value = s.brightness ?? 50;
+      elements.brightnessNight.value = s.brightnessNight ?? 20;
       const pct = (elements.brightness.value / 255) * 100;
       elements.brightness.title = Math.round(pct) + "%";
+      const pctNight = (elements.brightnessNight.value / 255) * 100;
+      elements.brightnessNight.title = Math.round(pctNight) + "%";
+
+      elements.dayTime.value = s.dayTime ?? "08:00";
+      elements.nightTime.value = s.nightTime ?? "22:00";
 
       if (appState.busName.length) elements.busLongName.innerHTML = "Location: <b>" + appState.busName + "</b>";
       toggleBusFilterBox();
@@ -1825,9 +1858,11 @@
       setCheckbox("rssPriority", s.rssPriority);
       show("optStayAwake",s.touch);
       show("optLongPressClock",s.touch);
-
-      elements.sleepStart.value = s.sleepStarts;
-      elements.sleepEnd.value = s.sleepEnds;
+      // convert legacy screensaver settings
+      if (typeof s.sleepStarts == "number") s.sleepStarts = `${String(s.sleepStarts).padStart(2, '0')}:00`;
+      if (typeof s.sleepEnds == "number") s.sleepEnds = `${String(s.sleepEnds).padStart(2, '0')}:00`;
+      elements.sleepStart.value = s.sleepStarts ?? "23:00";
+      elements.sleepEnd.value = s.sleepEnds ?? "06:00";
       elements.nrTimeOffset.value = s.nrTimeOffset ?? 0;
       elements.forceWakeTime.value = s.forceWakeTime ?? 300;
       const rssUrl = s.rssUrl || "";
@@ -1836,6 +1871,7 @@
       rssSelect.value = optionExists ? rssUrl : "";
       toggleSleepSelectors();
       show("optSleepUseBigClock",(s.sleep && !s.darkSleep));
+      elements.maxRailServices.value = s.maxRailServices ?? 9;
       document.getElementById('enableScheduler').checked = s.enableScheduler || false;
       document.getElementById('enableCarousel').checked = s.enableCarousel || false;
       appState.scheduler = s.scheduler || [];
@@ -1989,6 +2025,9 @@
       s.tubeLon = appState.tubeLon;
       s.mode = appState.boardMode;
       s.brightness = parseInt(elements.brightness.value);
+      s.brightnessNight = parseInt(elements.brightnessNight.value);
+      s.dayTime = elements.dayTime.value;
+      s.nightTime = elements.nightTime.value;
       s.sleep = isChecked("enableSleep");
       s.darkSleep = isChecked("darkSleep");
       s.sleepUseBigClock = isChecked("sleepUseBigClock");
@@ -2011,12 +2050,13 @@
       s.touch = isChecked("optTouch");
       s.longPressClock = isChecked("longPressClock");
       s.dataIcon = isChecked("optCommsIcon");
-      s.sleepStarts = parseInt(elements.sleepStart.value);
-      s.sleepEnds = parseInt(elements.sleepEnd.value);
+      s.sleepStarts = elements.sleepStart.value;
+      s.sleepEnds = elements.sleepEnd.value;
       s.nrTimeOffset = parseInt(elements.nrTimeOffset.value);
       s.forceWakeTime = parseInt(elements.forceWakeTime.value);
       s.rssUrl = elements.rssFeedList.value;
       s.rssPriority = isChecked("rssPriority");
+      s.maxRailServices = parseInt(elements.maxRailServices.value);
       if (elements.dataSource.value != "") s.dataSource = parseInt(elements.dataSource.value);
       var selectedText = document.querySelector("#rssFeedList option:checked").textContent;
       s.rssName = selectedText;

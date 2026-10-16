@@ -126,7 +126,9 @@ At start-up, the ESP32's IP address is displayed. To change the station or to co
 - **Only show these Bus services** - filter buses by service numbers (enter a list of the service numbers, comma separated).
 - **Recently verified ATCO codes** - quickly select from recently used bus stop ATCO codes.
 #### Options tab ####
-- **Brightness** - adjusts the brightness of the OLED screen.
+- **Day time brightness** - adjusts the brightness of the OLED screen during day time hours.
+- **Night time brightness** - adjusts the brightness of the OLED screen during night time hours.
+- **Day time / Night time** - Set the times for day time and night time settings.
 - **Show the date on screen** - displays the date in the upper-right corner (useful if you're also using this as a desk clock).
 - **Show current weather at station/bus stop** - optionally display weather conditions at the selected station or bus stop.
 - **Include bus replacement services** - optionally include bus replacement services (National Rail mode).
@@ -137,10 +139,11 @@ At start-up, the ESP32's IP address is displayed. To change the station or to co
 - **Show service last seen location** - adds the last reported location and time of a service to the Calling at list (National Rail).
 - **Wait for Calling at list to complete** - waits for the Calling at list to finish scrolling before changing the primary service.
 - **Wait for Messages or RSS to complete** - waits for the current service message or RSS headline feed to finish scrolling before changing the primary service.
+- **Maximum rail services to show** - select the maximum number of rail services that the board will cycle through.
 - **Full screen clock if no train services** - displays the full screen, Network SouthEast style station clock if there are no scheduled services at the selected railway station.
-- **Enable automatic firmware updates at startup** - automatically checks for AND installs the latest firmware from this repository when the system starts up.
-- **Enable daily check for firmware updates** - when enabled, the system will check for and install any updates just after midnight if the board is powered on.
-- **Enable overnight sleep mode (screensaver)** - if you're running the board 24/7, you can help prevent screen burn-in by enabling this option overnight.
+- **Automatic firmware updates at startup** - automatically checks for AND installs the latest firmware from this repository when the system starts up.
+- **Daily check for firmware updates** - when enabled, the system will check for and install any updates just after midnight if the board is powered on.
+- **Schedule sleep mode (screensaver)** - if you're running the board 24/7, you can help prevent screen burn-in by enabling this option.
 - **Switch off display during sleep mode** - turns off the display completely during sleep mode, otherwise displays the date & time.
 - **Full screen clock during sleep mode** - displays the full screen station clock during sleep mode.
 #### Schedule tab ####

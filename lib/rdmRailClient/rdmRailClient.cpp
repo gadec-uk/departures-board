@@ -181,6 +181,8 @@ int rdmRailClient::fetchDepartures(rdStation *station, stnMessages *messages, co
     xMessages->numMessages=0;
     xStation->platformAvailable=false;
     addedStopLocation = false;
+    numStoppingPoints = 0;
+    endCAL = nullptr;
     strcpy(xStation->location,"");
 
     for (int i=0;i<MAXBOARDSERVICES;++i) {
@@ -421,6 +423,7 @@ int rdmRailClient::getServiceDetails(const char *serviceID, String apiToken) {
     js->lastResultMessage[0] = '\0';
     // Use a spare char buffer space for the last report temporary text
     xStation->service[1].calling[0] = '\0';
+    serviceArrived = false;
 
     // Reset the counters
     WiFiClientSecure httpsClient;
@@ -517,7 +520,13 @@ int rdmRailClient::getServiceDetails(const char *serviceID, String apiToken) {
         strcpy(lastLocation.scheduledTime,thisLocation.scheduledTime);
     }
 
-    if (lastLocation.location[0] && lastLocation.actualTime[0] && lastLocation.scheduledTime[0]) {
+    if (serviceArrived) {
+        if (xStation->service[0].platform[0]) sprintf(xStation->service[1].calling,".  Currently at platform %s.",xStation->service[0].platform);
+        else strcpy(xStation->service[1].calling,".  Currently at platform.");
+        if ((strlen(xStation->service[0].calling) + strlen(xStation->service[1].calling)) < MAXCALLINGSIZE) {
+            strcat(xStation->service[0].calling, xStation->service[1].calling);
+        }
+    } else if (lastLocation.location[0] && lastLocation.actualTime[0] && lastLocation.scheduledTime[0]) {
         sprintf(xStation->service[1].calling,".  Last seen at %s",lastLocation.location);
         if (strcmp(lastLocation.actualTime,"On ti")==0) {
             sprintf(xStation->service[1].calling + strlen(xStation->service[1].calling)," (%s), on time.",lastLocation.scheduledTime);
@@ -623,10 +632,10 @@ void rdmRailClient::sanitiseData() {
     replaceWord(xMessages->messages[i],"&amp;","&");
     replaceWord(xMessages->messages[i],"&quot;","\"");
     // Remove unwanted text at the end of service messages...
-    pruneFromPhrase(xMessages->messages[i]," More details ");
-    pruneFromPhrase(xMessages->messages[i]," Latest information ");
-    pruneFromPhrase(xMessages->messages[i]," Further information ");
-    pruneFromPhrase(xMessages->messages[i]," More information ");
+    pruneFromPhrase(xMessages->messages[i],"More details ");
+    pruneFromPhrase(xMessages->messages[i],"Latest information ");
+    pruneFromPhrase(xMessages->messages[i],"Further information ");
+    pruneFromPhrase(xMessages->messages[i],"More information ");
     trimSpaces(xMessages->messages[i]);
 
     fixFullStop(xMessages->messages[i]);
@@ -692,6 +701,7 @@ void rdmRailClient::value(const char *value) {
                 if (xStation->service[id].calling[0]) strcat(xStation->service[id].calling,", ");
                 strcat(xStation->service[id].calling,value);
                 addedStopLocation = true;
+                numStoppingPoints++;
             }
             return;
         } else if (strcmp(js->currentKey, "st")==0 && inCallingArray == 1 && addedStopLocation) {
@@ -706,7 +716,10 @@ void rdmRailClient::value(const char *value) {
             }
             return;
         } else if (strcmp(js->currentKey, "isCancelled")==0 && inCallingArray == 1 && addedStopLocation) {
-            if (strcmp(value,"true")==0) *endCAL = '\0'; // remove this calling point, it's cancelled
+            if (strcmp(value,"true")==0) {
+                *endCAL = '\0'; // remove this calling point, it's cancelled
+                numStoppingPoints--;
+            }
             addedStopLocation = false;
             return;
         } else if (strcmp(js->currentKey, "coachClass")==0 && strcmp(js->arrayName, "formation/coaches")==0 && arrayNestLevel==2) {
@@ -774,11 +787,21 @@ void rdmRailClient::value(const char *value) {
                     xStation->service[id].isDelayed=false;
                 } else {
                     if (xStation->service[id].trainLength == 0) xStation->service[id].trainLength = coaches;
+                    // If there are multiple stopping points, insert the "and" prior to the final destination
+                    if (numStoppingPoints>1 && endCAL != nullptr && strlen(xStation->service[id].calling) + 4 < sizeof(xStation->service[0].calling)) {
+                        size_t tailLen = strlen(endCAL + 2) + 1;
+                        memmove(endCAL + 5, endCAL + 2, tailLen);
+                        memcpy(endCAL, " and ", 5);
+                    } else if (numStoppingPoints==1 && strlen(xStation->service[id].calling) + 5 < sizeof(xStation->service[0].calling)) {
+                        strcat(xStation->service[id].calling, " only");
+                    }
                     xStation->numServices++;
                     id++;
                 }
                 coaches=0;
+                numStoppingPoints=0;
                 keepRoute = false;
+                endCAL = nullptr;
             }
             return;
         } else if (strcmp(js->currentPath, "/locationName")==0) {
@@ -813,7 +836,7 @@ void rdmRailClient::value(const char *value) {
         } else if (strcmp(js->currentKey, "at")==0 && inCallingArray == 1) {
             strlcpy(thisLocation.actualTime,value,sizeof(thisLocation.actualTime));
             return;
-        }
+        } else if (strcmp(js->currentKey, "ata")==0 && !inCallingArray) serviceArrived = true;
     }
 }
 

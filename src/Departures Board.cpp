@@ -309,7 +309,7 @@ static const char btAttribution[] = "Powered by bustimes.org";
 
 #define SCREENSAVERINTERVAL 8000      // How often the screen is changed in sleep mode (ms - 8 seconds)
 #define DATAUPDATEINTERVAL 90000      // How often we fetch data from National Rail (ms - 1.5 mins) - "default" option
-#define FASTDATAUPDATEINTERVAL 45000  // How often we fetch data from National Rail (ms - 45 secs) - "fast" option
+#define FASTDATAUPDATEINTERVAL 40000  // How often we fetch data from National Rail (ms - 45 secs) - "fast" option
 #define UGDATAUPDATEINTERVAL 30000    // How often we fetch data from TfL (ms - 30 secs)
 #define BUSDATAUPDATEINTERVAL 45000   // How often we fetch data from bustimes.org (ms - 45 secs)
 #define RSSUPDATEINTERVAL 600000      // How often to refresh the RSS feed (ms - 10 mins)
@@ -359,9 +359,13 @@ static bool weatherEnabled = false;        // Showing weather at station locatio
 static bool enableBus = false;             // Include Bus services on the board?
 static bool firmwareUpdates = true;        // Check for and install firmware updates automatically at boot?
 static bool dailyUpdateCheck = false;      // Check for and install firmware updates at midnight?
-static byte sleepStarts = 0;               // Hour at which the overnight sleep (screensaver) begins
-static byte sleepEnds = 6;                 // Hour at which the overnight sleep (screensaver) ends
-static int brightness = 50;                // Initial brightness level of the OLED screen
+static int dayTime = 480;                  // Time (in minutes) at which day time begins
+static int nightTime = 1320;               // Time (in minutes) at which night time begins
+static bool isNightTime = false;           // Is is night time now?
+static int sleepStarts = 1380;             // Time (in minutes) at which the overnight sleep (screensaver) begins
+static int sleepEnds = 360;                // Time (in minutes) at which the overnight sleep (screensaver) ends
+static int brightness = 50;                // Day time brightness level of the OLED screen
+static int brightnessNight = 50;           // Night time brightness level of the OLED screen
 static unsigned long lastWiFiReconnect=0;  // Last WiFi reconnection time (millis)
 static bool firstLoad = true;              // Are we loading for the first time (no station config)?
 static int prevProgressBarPosition=0;      // Used for progress bar smooth animation
@@ -392,6 +396,7 @@ static unsigned long fwUpdateCheckTimer=0; // Next time to check if the day has 
 static bool apiKeys = false;               // Does apikeys.json exist?
 static bool touchEnabled = false;          // TTP223 Touch Sensor installed?
 static bool useRDMclient = false;          // Use the new Rail Data Marketplace API instead of Darwin Lite
+static int maxRailServices = MAXBOARDSERVICES; // Allows user override of number of service to show
 static bool enableScheduler = false;
 static bool enableCarousel = false;
 static int numCarouselSlots = 0;
@@ -1073,6 +1078,10 @@ String getBuildTime() {
   return String(buildtime);
 }
 
+int getTimeInMinutes() {
+  return (timeinfo.tm_hour * 60 + timeinfo.tm_min);
+}
+
 void checkPostWebUpgrade() {
   JsonDocument doc;
   char prevFirmware[15] = "B0.0-W0.0";
@@ -1124,11 +1133,32 @@ bool isSnoozing() {
     else return false;
   }
   if (!sleepEnabled) return false;
-  byte myHour = timeinfo.tm_hour;
+
+  int myTime = getTimeInMinutes();
   if (sleepStarts > sleepEnds) {
-    if ((myHour >= sleepStarts) || (myHour < sleepEnds)) return true; else return false;
+    if ((myTime >= sleepStarts) || (myTime < sleepEnds)) return true; else return false;
   } else {
-    if ((myHour >= sleepStarts) && (myHour < sleepEnds)) return true; else return false;
+    if ((myTime >= sleepStarts) && (myTime < sleepEnds)) return true; else return false;
+  }
+}
+
+
+// Returns true if it's night time
+bool isItNightTime() {
+  int myTime = getTimeInMinutes();
+  if (nightTime > dayTime) {
+    if ((myTime >= nightTime) || (myTime < dayTime)) return true; else return false;
+  } else {
+    if ((myTime >= nightTime) && (myTime < dayTime)) return true; else return false;
+  }
+}
+
+// Set the brightness to the correct values
+void configDayNight() {
+  if (isNightTime) {
+    u8g2.setContrast(brightnessNight);
+  } else {
+    u8g2.setContrast(brightness);
   }
 }
 
@@ -1196,7 +1226,7 @@ void saveFirmwareInfo() {
 
 // Write a default config file so that the Web GUI works initially (force Tube mode if no NR token)
 void writeDefaultConfig() {
-  String defaultConfig = "{\"crs\":\"\",\"station\":\"\",\"lat\":0,\"lon\":0,\"weather\":true,\"sleep\":false,\"showDate\":false,\"showBus\":false,\"update\":true,\"sleepStarts\":23,\"sleepEnds\":8,\"brightness\":20,\"tubeId\":\"\",\"tubeName\":\"\",\"mode\":" + String((!nrToken[0] && rdmDeparturesApiKey=="")?"1":"0") + "}";
+  String defaultConfig = "{\"crs\":\"\",\"station\":\"\",\"lat\":0,\"lon\":0,\"weather\":true,\"sleep\":false,\"showDate\":false,\"showBus\":false,\"update\":true,\"sleepStarts\":\"23:00\",\"sleepEnds\":\"08:00\",\"brightness\":20,\"tubeId\":\"\",\"tubeName\":\"\",\"mode\":" + String((!nrToken[0] && rdmDeparturesApiKey=="")?"1":"0") + "}";
   saveFile("/config.json",defaultConfig);
   resetLocationIds();
   saveFirmwareInfo();
@@ -1211,10 +1241,6 @@ bool pruneFromPhrase(char* input, const char* target) {
       return true;
   }
   return false;
-}
-
-int getTimeInMinutes() {
-  return (timeinfo.tm_hour * 60 + timeinfo.tm_min);
 }
 
 void loadSlot(JsonObjectConst slot, bool isDefault, boardModes requestedMode) {
@@ -1286,6 +1312,7 @@ void loadSlot(JsonObjectConst slot, bool isDefault, boardModes requestedMode) {
 // Load the configuration settings (if they exist, if not create a default set for the Web GUI page to read)
 void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFIG) {
   JsonDocument doc;
+  int h, m;
 
   // Set defaults
   strcpy(hostname,defaultHostname);
@@ -1324,9 +1351,14 @@ void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFI
         if (settings["weather"].is<bool>())           weatherEnabled = settings["weather"];
         if (settings["update"].is<bool>())            firmwareUpdates = settings["update"];
         if (settings["updateDaily"].is<bool>())       dailyUpdateCheck = settings["updateDaily"];
-        if (settings["sleepStarts"].is<int>())        sleepStarts = settings["sleepStarts"];
-        if (settings["sleepEnds"].is<int>())          sleepEnds = settings["sleepEnds"];
+        if (settings["dayTime"].is<const char*>() && sscanf(settings["dayTime"], "%d:%d", &h, &m) == 2) dayTime = (h * 60) + m;
+        if (settings["nightTime"].is<const char*>() && sscanf(settings["nightTime"], "%d:%d", &h, &m) == 2) nightTime = (h * 60) + m;
+        if (settings["sleepStarts"].is<const char*>() && sscanf(settings["sleepStarts"], "%d:%d", &h, &m) == 2) sleepStarts = (h * 60) + m;
+        else if (settings["sleepStarts"].is<int>()) sleepStarts = settings["sleepStarts"].as<int>() * 60;  // handle legacy setting
+        if (settings["sleepEnds"].is<const char*>() && sscanf(settings["sleepEnds"], "%d:%d", &h, &m) == 2) sleepEnds = (h * 60) + m;
+        else if (settings["sleepEnds"].is<int>()) sleepEnds = settings["sleepEnds"].as<int>() * 60;  // handle legacy setting
         if (settings["brightness"].is<int>())         brightness = settings["brightness"];
+        if (settings["brightnessNight"].is<int>())    brightnessNight = settings["brightnessNight"];
         if (settings["longPressClock"].is<bool>())    longPressClock = settings["longPressClock"];
         if (settings["sleepUseBigClock"].is<bool>())  useNSEclockForSleep = (settings["sleepUseBigClock"] && sleepClock);
 
@@ -1340,6 +1372,7 @@ void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFI
         if (settings["hidePlatform"].is<bool>())      hidePlatform = settings["hidePlatform"];
         if (settings["hideOrdinals"].is<bool>())      hideOrdinals = settings["hideOrdinals"];
         if (settings["showLastSeen"].is<bool>())      showLastSeen = settings["showLastSeen"];
+        if (settings["maxRailServices"].is<int>())    maxRailServices = settings["maxRailServices"];
         if (settings["showTubeLocation"].is<bool>())  showTubeCurrentLocation = settings["showTubeLocation"];
         if (settings["showServiceMsgs"].is<bool>())   showServiceMsgs = settings["showServiceMsgs"];
 
@@ -1380,7 +1413,6 @@ void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFI
             for (int i = 0; i < scheduler.size(); i++) {
               const char* timeStr = scheduler[i]["time"];
               if (timeStr) {
-                int h, m;
                 if (sscanf(timeStr, "%d:%d", &h, &m) == 2) {
                   int entryMins = h * 60 + m;
                   if (entryMins <= currentMins) {
@@ -1415,7 +1447,6 @@ void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFI
             // Save the time of the active entry
             const char* timeStrActive = scheduler[activeIndex]["time"];
             if (timeStrActive) {
-              int h, m;
               if (sscanf(timeStrActive, "%d:%d", &h, &m) == 2) {
                 activeSlotEventTime = h * 60 + m; // The time (in minutes) of the active event
               }
@@ -1424,7 +1455,6 @@ void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFI
             // Save the time of the next entry (for the loop scheduler)
             const char* timeStr = scheduler[nextIndex]["time"];
             if (timeStr) {
-              int h, m;
               if (sscanf(timeStr, "%d:%d", &h, &m) == 2) {
                 nextSlotEventTime = h * 60 + m; // The time (in minutes) of the next change
               }
@@ -1814,7 +1844,7 @@ void drawStationBoard() {
   if (firstLoad) {
     // Clear the entire screen for the first load since boot up/wake from sleep
     u8g2.clearBuffer();
-    u8g2.setContrast(brightness);
+    configDayNight();
     firstLoad=false;
     line3Service = noScrolling ? 1 : 0;
   } else {
@@ -1960,6 +1990,7 @@ void updateRailDepartures() {
   lastDataLoadTime = millis();
   noDataLoaded = false;
   dataLoadSuccess++;
+  if (station.numServices > maxRailServices) station.numServices = maxRailServices;
 }
 
 void waitForFirstLoad() {
@@ -2048,7 +2079,7 @@ void drawUndergroundBoard() {
   if (firstLoad) {
     // Clear the entire screen for the first load since boot up/wake from sleep
     u8g2.clearBuffer();
-    u8g2.setContrast(brightness);
+    configDayNight();
     firstLoad=false;
   } else {
       // Clear the top three lines
@@ -2151,7 +2182,7 @@ void drawBusDeparturesBoard() {
   if (firstLoad) {
     // Clear the entire screen for the first load since boot up/wake from sleep
     u8g2.clearBuffer();
-    u8g2.setContrast(brightness);
+    configDayNight();
     firstLoad=false;
   } else {
       // Clear the top three lines
@@ -2355,7 +2386,7 @@ void handleFormatFFS(AsyncWebServerRequest *request) {
 
 // Fallback function for browser requests
 void handleNotFound(AsyncWebServerRequest *request) {
-  if ((LittleFS.exists(request->url())) && (request->method() == HTTP_GET)) handleStreamFile(request->url(),request);
+  if ((LittleFS.exists(request->url())) && (request->method() == AsyncWebRequestMethod::HTTP_GET)) handleStreamFile(request->url(),request);
   else if (request->url() == "/keys.htm") handleStreamGzipFlashFile(request->url(), keyshtm, sizeof(keyshtm),request);
   else if (request->url() == "/index.htm") handleStreamGzipFlashFile(request->url(), indexhtm, sizeof(indexhtm),request);
   else if (request->url() == "/editrss.htm") handleStreamGzipFlashFile(request->url(), editrsshtm, sizeof(editrsshtm),request);
@@ -2503,7 +2534,6 @@ void handleBrightness(AsyncWebServerRequest *request) {
     int level = request->getParam("b")->value().toInt();
     if (level>0 && level<256) {
       u8g2.setContrast(level);
-      brightness = level;
       sendResponse(200,"OK",request);
       return;
     }
@@ -3593,6 +3623,10 @@ void loop(void) {
     // Exit sleep mode cleanly
     softResetBoard(MODE_LOADCONFIG);
   } else if (isSleeping && !wasSleeping && useNSEclockForSleep && !NSEclockIsActive) u8g2.setContrast(DIMMED_BRIGHTNESS);
+
+  bool wasNightTime = isNightTime;
+  isNightTime = isItNightTime();
+  if (isNightTime != wasNightTime && !isSleeping) configDayNight();
 
   // WiFi Status icon
   if (WiFi.status() != WL_CONNECTED && wifiConnected) {

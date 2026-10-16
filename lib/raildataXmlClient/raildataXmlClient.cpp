@@ -272,6 +272,8 @@ int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages
     xMessages->numMessages=0;
     xStation->platformAvailable=false;
     addedStopLocation = false;
+    numStoppingPoints = 0;
+    endCAL = nullptr;
     strcpy(xStation->location,"");
 
     for (int i=0;i<MAXBOARDSERVICES;++i) {
@@ -405,7 +407,16 @@ int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages
         return UPD_DATA_ERROR;
     }
     if (filterPlatforms && !keepRoute && xStation->numServices) xStation->numServices--;   // Last route added needs filtering out
-
+    else {
+        // If there are multiple stopping points, insert the "and" prior to the final destination
+        if (numStoppingPoints>1 && endCAL != nullptr && strlen(xStation->service[xStation->numServices-1].calling) + 4 < sizeof(xStation->service[0].calling)) {
+            size_t tailLen = strlen(endCAL + 2) + 1;
+            memmove(endCAL + 5, endCAL + 2, tailLen);
+            memcpy(endCAL, " and ", 5);
+        } else if (numStoppingPoints==1 && strlen(xStation->service[id].calling) + 5 < sizeof(xStation->service[0].calling)) {
+            strcat(xStation->service[id].calling, " only");
+        }
+    }
     if (!includeBusServices) {
         // Go through and delete any bus services
         int i=0;
@@ -530,6 +541,7 @@ int raildataXmlClient::getServiceDetails(const char *serviceID, const char *cust
     js->lastResultMessage[0] = '\0';
     // Use a spare char buffer space for the last report temporary text
     xStation->service[1].calling[0] = '\0';
+    serviceArrived = false;
 
     // Reset the counters
     WiFiClientSecure httpsClient;
@@ -640,7 +652,13 @@ int raildataXmlClient::getServiceDetails(const char *serviceID, const char *cust
         strcpy(lastLocation.scheduledTime,thisLocation.scheduledTime);
     }
 
-    if (lastLocation.location[0] && lastLocation.actualTime[0] && lastLocation.scheduledTime[0]) {
+    if (serviceArrived) {
+        if (xStation->service[0].platform[0]) sprintf(xStation->service[1].calling,".  Currently at platform %s.",xStation->service[0].platform);
+        else strcpy(xStation->service[1].calling,".  Currently at platform.");
+        if ((strlen(xStation->service[0].calling) + strlen(xStation->service[1].calling)) < MAXCALLINGSIZE) {
+            strcat(xStation->service[0].calling, xStation->service[1].calling);
+        }
+    } else if (lastLocation.location[0] && lastLocation.actualTime[0] && lastLocation.scheduledTime[0]) {
         sprintf(xStation->service[1].calling,".  Last seen at %s",lastLocation.location);
         if (strcmp(lastLocation.actualTime,"On ti")==0) {
             sprintf(xStation->service[1].calling + strlen(xStation->service[1].calling)," (%s), on time.",lastLocation.scheduledTime);
@@ -740,16 +758,19 @@ void raildataXmlClient::sanitiseData() {
     replaceWord(xMessages->messages[i],"<p>","");
     replaceWord(xMessages->messages[i],"</p>"," ");
     replaceWord(xMessages->messages[i],"<br>"," ");
+    replaceWord(xMessages->messages[i],"&amp;nbsp;"," "); // Darwin bug
+    replaceWord(xMessages->messages[i],"&amp;amp;","&"); // Darwin bug
+
     replaceWord(xMessages->messages[i],"&nbsp;"," ");
 
     removeHtmlTags(xMessages->messages[i]);
     replaceWord(xMessages->messages[i],"&amp;","&");
     replaceWord(xMessages->messages[i],"&quot;","\"");
     // Remove unwanted text at the end of service messages...
-    pruneFromPhrase(xMessages->messages[i]," More details ");
-    pruneFromPhrase(xMessages->messages[i]," Latest information ");
-    pruneFromPhrase(xMessages->messages[i]," Further information ");
-    pruneFromPhrase(xMessages->messages[i]," More information ");
+    pruneFromPhrase(xMessages->messages[i],"More details ");
+    pruneFromPhrase(xMessages->messages[i],"Latest information ");
+    pruneFromPhrase(xMessages->messages[i],"Further information ");
+    pruneFromPhrase(xMessages->messages[i],"More information ");
     trimSpaces(xMessages->messages[i]);
 
     fixFullStop(xMessages->messages[i]);
@@ -827,6 +848,7 @@ void raildataXmlClient::value(const char *value)
                 if (xStation->service[id].calling[0]) strcat(xStation->service[id].calling,", ");
                 strcat(xStation->service[id].calling,value);
                 addedStopLocation = true;
+                numStoppingPoints++;
             }
             return;
         } else if (tagLevel == 11 && tagPath.endsWith("callingPoint/lt8:st") && addedStopLocation) {
@@ -842,7 +864,10 @@ void raildataXmlClient::value(const char *value)
             }
             return;
         } else if (tagLevel == 11 && tagPath.endsWith("callingPoint/lt8:isCancelled") && addedStopLocation) {
-            if (strcmp(value,"true")==0) *endCAL = '\0'; // remove this calling point, it's cancelled
+            if (strcmp(value,"true")==0) {
+                *endCAL = '\0'; // remove this calling point, it's cancelled
+                numStoppingPoints--;
+            }
             addedStopLocation = false;
             return;
         } else if (tagLevel == 11 && tagName == "lt7:coachClass") {
@@ -887,8 +912,20 @@ void raildataXmlClient::value(const char *value)
                 xStation->service[id].isDelayed=false;
                 xStation->numServices--;
                 id--;
+            } else {
+                // If there are multiple stopping points, insert the "and" prior to the final destination
+                if (numStoppingPoints>1 && endCAL != nullptr && id>=0 && strlen(xStation->service[id].calling) + 4 < sizeof(xStation->service[0].calling)) {
+                    size_t tailLen = strlen(endCAL + 2) + 1;
+                    memmove(endCAL + 5, endCAL + 2, tailLen);
+                    memcpy(endCAL, " and ", 5);
+                    endCAL = nullptr;
+                } else if (numStoppingPoints==1 && strlen(xStation->service[id].calling) + 5 < sizeof(xStation->service[0].calling)) {
+                    strcat(xStation->service[id].calling, " only");
+                }
             }
             keepRoute = false;  // reset for next route
+            endCAL = nullptr;
+            numStoppingPoints = 0;
             if (id>=0) {
                 if (xStation->service[id].trainLength == 0) xStation->service[id].trainLength = coaches;
             }
@@ -954,7 +991,7 @@ void raildataXmlClient::value(const char *value)
                 strlcpy(thisLocation.actualTime,value,sizeof(thisLocation.actualTime));
                 return;
             }
-        }
+        } else if (tagLevel ==6 && tagPath.endsWith("lt7:ata")) serviceArrived = true;
     }
 }
 
