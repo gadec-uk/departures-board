@@ -275,7 +275,7 @@
                   </div>
                 </div>
 
-                <div id="optShowPlatform" style="display:none">
+                <div id="optRailOnlySection" style="display:none">
                   <hr class="my-0 opacity-10">
                   <div class="py-3">
                     <div class="d-flex justify-content-between align-items-center">
@@ -287,9 +287,7 @@
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div id="optShowOrdinals" style="display:none">
                   <hr class="my-0 opacity-10">
                   <div class="py-2">
                     <div class="d-flex justify-content-between align-items-center">
@@ -302,18 +300,46 @@
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div id="optShowLastSeen" style="display:none">
+                  <div id="optShowLastSeen" style="display:none">
+                    <hr class="my-0 opacity-10">
+                    <div class="py-2">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                          <label class="form-check-label d-block" for="showLastSeen">Show service last seen location</label>
+                          <div class="small text-body-secondary">Adds last reported location to the Calling at list</div>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                          <input class="form-check-input" type="checkbox" id="showLastSeen" role="switch">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <hr class="my-0 opacity-10">
                   <div class="py-2">
                     <div class="d-flex justify-content-between align-items-center">
                       <div>
-                        <label class="form-check-label d-block" for="showLastSeen">Show service last seen location</label>
-                        <div class="small text-body-secondary">Adds last reported location to the Calling at list</div>
+                        <label class="form-check-label d-block" for="showCallingTimes">Include arrival times in Calling at list</label>
+                        <div class="small text-body-secondary">Adds estimated arrival times for each calling stop</div>
                       </div>
                       <div class="form-check form-switch mb-0">
-                        <input class="form-check-input" type="checkbox" id="showLastSeen" role="switch">
+                        <input class="form-check-input" type="checkbox" id="showCallingTimes" role="switch">
+                      </div>
+                    </div>
+                  </div>
+
+                  <hr class="my-0 opacity-10">
+                  <div class="py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <label class="form-check-label d-inline-block" for="showFullCalling">Wait for Calling at list to complete</label>
+                        <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right"
+                          title="Waits for the Calling at service list to complete scrolling before changing the primary service on the board. Enable this for busy stations if you want to see the full calling at list for a service."
+                          style="cursor:pointer;"></i>
+                      </div>
+                      <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="showFullCalling" role="switch">
                       </div>
                     </div>
                   </div>
@@ -329,23 +355,6 @@
                       </div>
                       <div class="form-check form-switch mb-0">
                         <input class="form-check-input" type="checkbox" id="showTubeLocation" role="switch">
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div id="optShowFullCalling" style="display:none">
-                  <hr class="my-0 opacity-10">
-                  <div class="py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                      <div>
-                        <label class="form-check-label d-inline-block" for="showFullCalling">Wait for Calling at list to complete</label>
-                        <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="right"
-                          title="Waits for the Calling at service list to complete scrolling before changing the primary service on the board. Enable this for busy stations if you want to see the full calling at list for a service."
-                          style="cursor:pointer;"></i>
-                      </div>
-                      <div class="form-check form-switch mb-0">
-                        <input class="form-check-input" type="checkbox" id="showFullCalling" role="switch">
                       </div>
                     </div>
                   </div>
@@ -1598,10 +1607,8 @@
       show("rdgAtt", rail && appState.dataSource == 1);
       show("optBuses", rail);
       show("optShowServiceMsgs", rail || tube);
-      show("optShowPlatform", rail);
-      show("optShowOrdinals",rail);
+      show("optRailOnlySection", rail);
       show("optShowLastSeen", rail && (appState.dataSource == 0 || appState.validRdgServiceToken));
-      show("optShowFullCalling",rail);
       show("optShowFullMsgs", rail || tube);
       show("optShowClockNoServices", rail);
       show("optMaxRailServices", rail);
@@ -1845,6 +1852,7 @@
       setCheckbox("showPlatform", !(s.hidePlatform ?? false));
       setCheckbox("showOrdinals", !(s.hideOrdinals ?? false));
       setCheckbox("showLastSeen", s.showLastSeen);
+      setCheckbox("showCallingTimes", (s.showCallingTimes ?? true));
       setCheckbox("showServiceMsgs", s.showServiceMsgs ?? true);
       setCheckbox("showTubeLocation", s.showTubeLocation ?? false);
       setCheckbox("showFullCalling", (s.showFullCalling ?? true));
@@ -2041,6 +2049,7 @@
       s.hidePlatform = !isChecked("showPlatform");
       s.hideOrdinals = !isChecked("showOrdinals");
       s.showLastSeen = isChecked("showLastSeen");
+      s.showCallingTimes = isChecked("showCallingTimes");
       s.showFullCalling = isChecked("showFullCalling");
       s.showFullMsgs = isChecked("showFullMsgs");
       s.showClockNoServices = isChecked("showClockNoServices");

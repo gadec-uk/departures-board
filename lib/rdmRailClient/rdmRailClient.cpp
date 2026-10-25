@@ -170,7 +170,7 @@ void rdmRailClient::cleanFilter(const char* rawFilter, char* cleanedFilter, size
 //
 // Fetches the Departure Board data
 //
-int rdmRailClient::fetchDepartures(rdStation *station, stnMessages *messages, const char *crsCode, String departuresApiKey, String serviceApiKey, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms, int timeOffset, bool fetchLastSeen, bool includeServiceMessages) {
+int rdmRailClient::fetchDepartures(rdStation *station, stnMessages *messages, const char *crsCode, String departuresApiKey, String serviceApiKey, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms, int timeOffset, bool fetchLastSeen, bool includeServiceMessages, bool includeCallingTimes) {
 
     unsigned long perfTimer=millis();
     bool bChunked = false;
@@ -183,6 +183,7 @@ int rdmRailClient::fetchDepartures(rdStation *station, stnMessages *messages, co
     addedStopLocation = false;
     numStoppingPoints = 0;
     endCAL = nullptr;
+    addCallingTimes = includeCallingTimes;
     strcpy(xStation->location,"");
 
     for (int i=0;i<MAXBOARDSERVICES;++i) {
@@ -205,6 +206,8 @@ int rdmRailClient::fetchDepartures(rdStation *station, stnMessages *messages, co
     for (int i=0;i<MAXBOARDMESSAGES;++i) strcpy(xMessages->messages[i],"");
     id=0;
     coaches=0;
+    stcp[0] = '\0';
+
     WiFiClientSecure httpsClient;
     httpsClient.setInsecure();
     httpsClient.setTimeout(8000);
@@ -321,18 +324,29 @@ int rdmRailClient::fetchDepartures(rdStation *station, stnMessages *messages, co
     size_t arraySize = xStation->numServices;
     std::sort(xStation->service, xStation->service+arraySize,compareTimes);
 
-    while (xStation->numServices > 1 && (xStation->service[0].isCancelled || strcmp(xStation->service[0].etd,"Delayed")==0)) {
-        // First service is cancelled or delayed (without estimate), check if it should be dropped
-        struct tm nowtime;
-        getLocalTime(&nowtime);
-        char timenow[6];
-        sprintf(timenow,"%02d:%02d",nowtime.tm_hour,nowtime.tm_min);
-        if (timeDiff(xStation->service[0].sortTime,timenow) < -1) deleteService(0); else break; // stop checking
+    int bottomOfList = xStation->numServices;
+    struct tm nowtime;
+    getLocalTime(&nowtime);
+    char timenow[6];
+    sprintf(timenow,"%02d:%02d",nowtime.tm_hour,nowtime.tm_min);
+
+    for (int i=0;i<xStation->numServices;++i) {
+        xStation->service[i].sortOrder = i;
+        if ((xStation->service[i].isCancelled || strcmp(xStation->service[i].etd,"Delayed")==0) && (timeDiff(xStation->service[i].sortTime,timenow) < -1)) {
+            xStation->service[i].sortOrder = bottomOfList++;
+        }
     }
+
+    // Resort the services
+    std::sort(xStation->service, xStation->service + arraySize, [](const auto& a, const auto& b) {
+        return a.sortOrder < b.sortOrder;
+    });
 
     // Handle getting last seen location from GetServiceDetails api
     if (fetchLastSeen && serviceApiKey!="" && xStation->numServices && xStation->service[0].serviceID[0] && strcmp(xStation->location,xStation->service[0].origin)) {
         getServiceDetails(xStation->service[0].serviceID, serviceApiKey);
+    } else {
+        if (strlen(xStation->service[0].calling)+1 < MAXCALLINGSIZE) strcat(xStation->service[0].calling,".");
     }
 
     // Do we want service messages?
@@ -537,6 +551,8 @@ int rdmRailClient::getServiceDetails(const char *serviceID, String apiToken) {
         if ((strlen(xStation->service[0].calling) + strlen(xStation->service[1].calling)) < MAXCALLINGSIZE) {
             strcat(xStation->service[0].calling, xStation->service[1].calling);
         }
+    } else {
+        if (strlen(xStation->service[0].calling)+1 < MAXCALLINGSIZE) strcat(xStation->service[0].calling,".");
     }
 
     sprintf(js->lastResultMessage,"[SD] OK: D:%d T:%d ",dataReceived,millis()-perfTimer);
@@ -695,6 +711,7 @@ void rdmRailClient::value(const char *value) {
         if (strcmp(js->currentKey, "locationName")==0 && inCallingArray == 1) {
             // Save the current position of the end of the calling list
             endCAL = xStation->service[id].calling + strlen(xStation->service[id].calling);
+            catPos = 0;
             // Check if there's room to add another stopping point
             if ((strlen(xStation->service[id].calling) + strlen(value) + 13) < sizeof(xStation->service[0].calling)) {
                 // Add the calling point, add a comma prefix if this isn't the first one
@@ -702,17 +719,26 @@ void rdmRailClient::value(const char *value) {
                 strcat(xStation->service[id].calling,value);
                 addedStopLocation = true;
                 numStoppingPoints++;
+                catPos = strlen(xStation->service[id].calling); // save position of time
             }
             return;
         } else if (strcmp(js->currentKey, "st")==0 && inCallingArray == 1 && addedStopLocation) {
             // Save the scheduled time of the calling point
             strlcpy(stcp,value,sizeof(stcp));
+            // check there's still room to add the eta of the calling point and calling times are enabled
+            if (addCallingTimes && stcp[0] && (strlen(xStation->service[id].calling) + strlen(stcp) + 4) < sizeof(xStation->service[0].calling)) {
+                sprintf(xStation->service[id].calling + strlen(xStation->service[id].calling)," (%s)",stcp);
+            }
             return;
         } else if (strcmp(js->currentKey, "et")==0 && inCallingArray == 1 && addedStopLocation) {
-            if (isdigit(value[0])) strlcpy(stcp,value,sizeof(stcp)); // Use the eta if available
-            // check there's still room to add the eta of the calling point
-            if ((strlen(xStation->service[id].calling) + strlen(stcp) + 4) < sizeof(xStation->service[0].calling)) {
-                sprintf(xStation->service[id].calling + strlen(xStation->service[id].calling)," (%s)",stcp);
+            if (isdigit(value[0])) {
+                strlcpy(stcp,value,sizeof(stcp)); // Use the eta if available
+                // remove previously saved schedule time
+                if (addCallingTimes && catPos) xStation->service[id].calling[catPos] = '\0';
+                // check there's still room to add the eta of the calling point and calling times are enabled
+                if (addCallingTimes && stcp[0] && (strlen(xStation->service[id].calling) + strlen(stcp) + 4) < sizeof(xStation->service[0].calling)) {
+                    sprintf(xStation->service[id].calling + strlen(xStation->service[id].calling)," (%s)",stcp);
+                }
             }
             return;
         } else if (strcmp(js->currentKey, "isCancelled")==0 && inCallingArray == 1 && addedStopLocation) {
@@ -802,6 +828,7 @@ void rdmRailClient::value(const char *value) {
                 numStoppingPoints=0;
                 keepRoute = false;
                 endCAL = nullptr;
+                stcp[0] = '\0';
             }
             return;
         } else if (strcmp(js->currentPath, "/locationName")==0) {

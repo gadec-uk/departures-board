@@ -72,6 +72,7 @@ struct rdService {
     int serviceType;
     char serviceID[18];
     char sortTime[6];
+    int sortOrder;
   };
 
   struct rdiStation {

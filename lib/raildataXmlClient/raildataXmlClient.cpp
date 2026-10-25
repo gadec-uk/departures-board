@@ -261,7 +261,7 @@ void raildataXmlClient::cleanFilter(const char* rawFilter, char* cleanedFilter, 
 //
 // Fetches the Departure Board data from the SOAP API
 //
-int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms, int timeOffset, bool fetchLastSeen, bool includeServiceMessages) {
+int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages, const char *crsCode, const char *customToken, int numRows, bool includeBusServices, const char *callingCrsCode, const char *platforms, int timeOffset, bool fetchLastSeen, bool includeServiceMessages, bool includeCallingTimes) {
 
     unsigned long perfTimer=millis();
     bool bChunked = false;
@@ -274,6 +274,7 @@ int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages
     addedStopLocation = false;
     numStoppingPoints = 0;
     endCAL = nullptr;
+    addCallingTimes = includeCallingTimes;
     strcpy(xStation->location,"");
 
     for (int i=0;i<MAXBOARDSERVICES;++i) {
@@ -296,6 +297,7 @@ int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages
     for (int i=0;i<MAXBOARDMESSAGES;++i) strcpy(xMessages->messages[i],"");
     id=-1;
     coaches=0;
+    stcp[0] = '\0';
 
     WiFiClientSecure httpsClient;
     httpsClient.setInsecure();
@@ -439,18 +441,29 @@ int raildataXmlClient::fetchDepartures(rdStation *station, stnMessages *messages
     size_t arraySize = xStation->numServices;
     std::sort(xStation->service, xStation->service+arraySize,compareTimes);
 
-    while (xStation->numServices > 1 && (xStation->service[0].isCancelled || strcmp(xStation->service[0].etd,"Delayed")==0)) {
-        // First service is cancelled or delayed (without estimate), check if it should be dropped
-        struct tm nowtime;
-        getLocalTime(&nowtime);
-        char timenow[6];
-        sprintf(timenow,"%02d:%02d",nowtime.tm_hour,nowtime.tm_min);
-        if (timeDiff(xStation->service[0].sortTime,timenow) < -1) deleteService(0); else break; // stop checking
+    int bottomOfList = xStation->numServices;
+    struct tm nowtime;
+    getLocalTime(&nowtime);
+    char timenow[6];
+    sprintf(timenow,"%02d:%02d",nowtime.tm_hour,nowtime.tm_min);
+
+    for (int i=0;i<xStation->numServices;++i) {
+        xStation->service[i].sortOrder = i;
+        if ((xStation->service[i].isCancelled || strcmp(xStation->service[i].etd,"Delayed")==0) && (timeDiff(xStation->service[i].sortTime,timenow) < -1)) {
+            xStation->service[i].sortOrder = bottomOfList++;
+        }
     }
+
+    // Resort the services
+    std::sort(xStation->service, xStation->service + arraySize, [](const auto& a, const auto& b) {
+        return a.sortOrder < b.sortOrder;
+    });
 
     // Handle getting last seen location from GetServiceDetails api
     if (fetchLastSeen && xStation->numServices && xStation->service[0].serviceID[0] && strcmp(xStation->location,xStation->service[0].origin)) {
         getServiceDetails(xStation->service[0].serviceID, customToken);
+    } else {
+        if (strlen(xStation->service[0].calling)+1 < MAXCALLINGSIZE) strcat(xStation->service[0].calling,".");
     }
 
     // Do we want service messages?
@@ -669,6 +682,8 @@ int raildataXmlClient::getServiceDetails(const char *serviceID, const char *cust
         if ((strlen(xStation->service[0].calling) + strlen(xStation->service[1].calling)) < MAXCALLINGSIZE) {
             strcat(xStation->service[0].calling, xStation->service[1].calling);
         }
+    } else {
+        if (strlen(xStation->service[0].calling)+1 < MAXCALLINGSIZE) strcat(xStation->service[0].calling,".");
     }
 
     sprintf(js->lastResultMessage,"[SD] OK: D:%d T:%d ",dataReceived,millis()-perfTimer);
@@ -842,6 +857,7 @@ void raildataXmlClient::value(const char *value)
         if (tagLevel == 11 && tagPath.endsWith("callingPoint/lt8:locationName")) {
             // Save the current position of the end of the calling list
             endCAL = xStation->service[id].calling + strlen(xStation->service[id].calling);
+            catPos = 0;
             // Check if there's room to add another stopping point
             if ((strlen(xStation->service[id].calling) + strlen(value) + 13) < sizeof(xStation->service[0].calling)) {
                 // Add the calling point, add a comma prefix if this isn't the first one
@@ -849,18 +865,29 @@ void raildataXmlClient::value(const char *value)
                 strcat(xStation->service[id].calling,value);
                 addedStopLocation = true;
                 numStoppingPoints++;
+                catPos = strlen(xStation->service[id].calling); // save position of time
             }
             return;
         } else if (tagLevel == 11 && tagPath.endsWith("callingPoint/lt8:st") && addedStopLocation) {
             strlcpy(stcp,value,sizeof(stcp));
-            return;
-        } else if (tagLevel == 11 && tagPath.endsWith("callingPoint/lt8:et") && addedStopLocation) {
-            if (isdigit(value[0])) strlcpy(stcp,value,sizeof(stcp)); // Use the eta if available
-            // check there's still room to add the eta of the calling point
-            if ((strlen(xStation->service[id].calling) + strlen(stcp) + 4) < sizeof(xStation->service[0].calling)) {
+            // check there's still room to add the scheduled time of the calling point and calling times are enabled
+            if (addCallingTimes && stcp[0] && (strlen(xStation->service[id].calling) + strlen(stcp) + 4) < sizeof(xStation->service[0].calling)) {
                 strcat(xStation->service[id].calling," (");
                 strcat(xStation->service[id].calling,stcp);
                 strcat(xStation->service[id].calling,")");
+            }
+            return;
+        } else if (tagLevel == 11 && tagPath.endsWith("callingPoint/lt8:et") && addedStopLocation) {
+            if (isdigit(value[0])) {
+                strlcpy(stcp,value,sizeof(stcp)); // Use the eta if available
+                // remove previously saved schedule time
+                if (addCallingTimes && catPos) xStation->service[id].calling[catPos] = '\0';
+                // check there's still room to add the eta time of the calling point and calling times are enabled
+                if (addCallingTimes && stcp[0] && (strlen(xStation->service[id].calling) + strlen(stcp) + 4) < sizeof(xStation->service[0].calling)) {
+                    strcat(xStation->service[id].calling," (");
+                    strcat(xStation->service[id].calling,stcp);
+                    strcat(xStation->service[id].calling,")");
+                }
             }
             return;
         } else if (tagLevel == 11 && tagPath.endsWith("callingPoint/lt8:isCancelled") && addedStopLocation) {
@@ -925,6 +952,7 @@ void raildataXmlClient::value(const char *value)
             }
             keepRoute = false;  // reset for next route
             endCAL = nullptr;
+            stcp[0] = '\0';
             numStoppingPoints = 0;
             if (id>=0) {
                 if (xStation->service[id].trainLength == 0) xStation->service[id].trainLength = coaches;

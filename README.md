@@ -137,6 +137,7 @@ At start-up, the ESP32's IP address is displayed. To change the station or to co
 - **Show platform numbers if available** - deselecting this option will hide platform numbers (National Rail).
 - **Show service ordinal numbers** - displays "2nd","3rd","4th" etc. next to the service times (National Rail).
 - **Show service last seen location** - adds the last reported location and time of a service to the Calling at list (National Rail).
+- **Include arrival times in Calling at list** - shows the estimated arrival times for each calling stop (National Rail).
 - **Wait for Calling at list to complete** - waits for the Calling at list to finish scrolling before changing the primary service.
 - **Wait for Messages or RSS to complete** - waits for the current service message or RSS headline feed to finish scrolling before changing the primary service.
 - **Maximum rail services to show** - select the maximum number of rail services that the board will cycle through.

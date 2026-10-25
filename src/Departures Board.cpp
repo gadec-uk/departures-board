@@ -176,7 +176,7 @@ static const uint8_t NatRailSmall9[1329] U8G2_FONT_SECTION("NatRailSmall9") =
   "\311\2S\13u(m\226L]\265d\1T\11u(-\6)\354\11U\11u(-\62\337\222\5V"
   "\12u(-\62oI-\2W\13u(-\62\227DIn\1X\14u(-\62-\251UjZ\0"
   "Y\13u(-\62-\251\205M\0Z\12u(-\6\61\353\70\10[\10r('\226.\2\134\12t"
-  "(+\62-\323\62-]\10r(\63\224.\3^\6#xi\32_\7\24\30+\206\0`\7\42x"
+  "(+\62-\323\62-]\10r('\224.\3^\6#xi\32_\7\24\30+\206\0`\7\42x"
   "'\242\0a\12U(m\326d\320\222!b\13u(-\302\212I\323\6\5c\11U(m\6\261:"
   "\4d\13u(-+\246MK\206\0e\12U(m\226l\30\322!f\12t(\253*\245)+\1"
   "g\14u\10m\6\315\226\14\341\240\0h\12u(-\302\212I\263\5i\7q(%\222Aj\13\224"
@@ -343,6 +343,7 @@ static bool isSleeping = false;            // Is the screen sleeping (showing th
 static bool sleepEnabled = false;          // Is overnight sleep enabled?
 static bool forcedSleep = false;           // Is the system in manual sleep mode?
 static bool forcedAwake = false;           // Was the system woken by touch sensor?
+static unsigned long screensaverTimer = 0; // Changing the screensaver display
 static int stayAwakeSeconds = 300;         // How long to force stay awake since last tap
 static bool sleepClock = true;             // Showing the clock in sleep mode?
 static bool useNSEclockForSleep = false;   // Use the large NSE clock in "sleep" mode?
@@ -386,6 +387,7 @@ static String timezone = "";               // custom (non UK) timezone for the c
 static bool hidePlatform = false;          // Hide platform numbers on Rail board?
 static bool hideOrdinals = false;          // Hide service ordinals (2nd, 3rd, 4th etc.)
 static bool showLastSeen = false;          // Include last reported arrival after the calling at list
+static bool showCallingTimes = true;       // Add scheduled/expected times to calling at list
 static bool showFullCalling = true;        // Wait for the "Calling at" list to finish scrolling before changing the primary service
 static bool showFullMsgs = true;           // Wait for the current service message or RSS feed to finish scrolling before changing primary service
 static bool showServiceMsgs = true;        // Show station and service messages (rail/tube)
@@ -1371,6 +1373,7 @@ void loadConfig(bool coldBoot = false, boardModes requestedMode = MODE_LOADCONFI
         if (settings["nrTimeOffset"].is<int>())       nrTimeOffset = settings["nrTimeOffset"];
         if (settings["hidePlatform"].is<bool>())      hidePlatform = settings["hidePlatform"];
         if (settings["hideOrdinals"].is<bool>())      hideOrdinals = settings["hideOrdinals"];
+        if (settings["showCallingTimes"].is<bool>())  showCallingTimes = settings["showCallingTimes"];
         if (settings["showLastSeen"].is<bool>())      showLastSeen = settings["showLastSeen"];
         if (settings["maxRailServices"].is<int>())    maxRailServices = settings["maxRailServices"];
         if (settings["showTubeLocation"].is<bool>())  showTubeCurrentLocation = settings["showTubeLocation"];
@@ -2686,7 +2689,7 @@ void departureBoardLoop() {
       if (!station.service[0].via[0]) isShowingVia=false;
       drawPrimaryService(isShowingVia);
       u8g2.updateDisplayArea(0,1,32,3);
-      if (station.calling[0] && showFullCalling) {
+      if (station.calling[0] && !noScrolling) {
         for (int i=0;i<numMessages;i++) {
           if (strncmp("Calling",line2[i],7)==0) {
             // refresh the calling at times
@@ -2702,7 +2705,7 @@ void departureBoardLoop() {
   }
 
   if (fetchComplete && lastUpdateResult != UPD_SEC_CHANGE && !isScrollingService && !isSleeping) {
-    if (!isScrollingStops || (!showFullCalling && isShowingCalling) || (!showFullMsgs && !isShowingCalling)) {
+    if ((!isScrollingStops && millis()>=timer) || (!showFullCalling && isShowingCalling) || (!showFullMsgs && !isShowingCalling)) {
       fetchComplete = false;
       // Get the update data if there is any
       if (lastUpdateResult == UPD_SUCCESS) {
@@ -3162,9 +3165,9 @@ void fetchDeparturesTask(void *pvParameters) {
         switch (boardMode) {
           case MODE_RAIL:
             if (useRDMclient) {
-              lastUpdateResult = rdmRailData.fetchDepartures(&station,&messages,locationCode,rdmDeparturesApiKey,rdmServiceApiKey,MAXBOARDSERVICES,enableBus,callingCrsCode,locationCleanFilter,nrTimeOffset,(showLastSeen && !noScrolling),showServiceMsgs);
+              lastUpdateResult = rdmRailData.fetchDepartures(&station,&messages,locationCode,rdmDeparturesApiKey,rdmServiceApiKey,MAXBOARDSERVICES,enableBus,callingCrsCode,locationCleanFilter,nrTimeOffset,(showLastSeen && !noScrolling),showServiceMsgs,showCallingTimes);
             } else {
-              lastUpdateResult = darwinRailData.fetchDepartures(&station,&messages,locationCode,nrToken,MAXBOARDSERVICES,enableBus,callingCrsCode,locationCleanFilter,nrTimeOffset,(showLastSeen && !noScrolling),showServiceMsgs);
+              lastUpdateResult = darwinRailData.fetchDepartures(&station,&messages,locationCode,nrToken,MAXBOARDSERVICES,enableBus,callingCrsCode,locationCleanFilter,nrTimeOffset,(showLastSeen && !noScrolling),showServiceMsgs,showCallingTimes);
             }
             nextDataUpdate = millis()+apiRefreshRate;
             break;
@@ -3616,9 +3619,9 @@ void loop(void) {
   bool wasSleeping = isSleeping;
   isSleeping = isSnoozing();
 
-  if (isSleeping && !useNSEclockForSleep && !NSEclockIsActive && millis()>timer) {       // If the "screensaver" is active, change the screen every 8 seconds
+  if (isSleeping && !useNSEclockForSleep && !NSEclockIsActive && millis()-screensaverTimer > SCREENSAVERINTERVAL) {       // If the "screensaver" is active, change the screen every 8 seconds
     drawSleepingScreen();
-    timer=millis() + SCREENSAVERINTERVAL;
+    screensaverTimer = millis();
   } else if (wasSleeping && !isSleeping) {
     // Exit sleep mode cleanly
     softResetBoard(MODE_LOADCONFIG);
