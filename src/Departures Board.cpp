@@ -851,13 +851,14 @@ void showNoDataScreen() {
   isScrollingService = false;
   isScrollingStops = false;
   firstLoad = true;
+  noDataLoaded = true;
+  station.numServices = 0;
   u8g2.clearBuffer();
   char msg[60];
   u8g2.setFont(NatRailTall12);
   switch (boardMode) {
     case MODE_RAIL:
       sprintf(msg,"No data available for station code \"%s\".",locationCode);
-      noDataLoaded = true;
       break;
     case MODE_TUBE:
       strcpy(msg,"No data available for the selected station.");
@@ -2011,12 +2012,12 @@ void waitForFirstLoad() {
   // Wait for the first data load
   while (!fetchComplete) {
     delay(250);
-    if (startupProgressPercent<95) {
+    if (startupProgressPercent<95 && dataLoadFailure < MAX_IGNORED_ERRORS) {
       startupProgressPercent+=5;
       drawProgressBar(startupProgressPercent);
     }
   }
-  drawProgressBar(100);
+  if (dataLoadFailure < MAX_IGNORED_ERRORS) drawProgressBar(100);
 }
 
 /*
