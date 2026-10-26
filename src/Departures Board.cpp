@@ -150,6 +150,8 @@ U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI u8g2(U8G2_R0, /* cs=*/ GPIO_NUM_26, /* dc=*/
 #define ULINE3 41
 #define ULINE4 56
 
+#define MAX_IGNORED_ERRORS 4
+
 static Ticker restartTimer; // used to schedule reboots
 
 //
@@ -374,7 +376,8 @@ static int startupProgressPercent;         // Initialisation progress
 static bool wifiConnected = false;         // Connected to WiFi?
 volatile unsigned long nextDataUpdate = 0; // Next National Rail update time (millis)
 static int dataLoadSuccess = 0;            // Count of successful data downloads
-static int dataLoadFailure = 0;            // Count of failed data downloads
+static int dataLoadFailure = 0;            // Count of failed data downloads since last success
+static int dataLoadFailureTotal = 0;       // Total number of failed data downloads
 static unsigned long lastLoadFailure = 0;  // When the last failure occurred
 static bool noDataLoaded = true;           // True if no data received for the location
 static unsigned long lastDataLoadTime = 0; // Timestamp of last data load
@@ -844,12 +847,17 @@ void showSetupScreen() {
 
 void showNoDataScreen() {
   noServiceClockIsActive = false;
+  isScrollingPrimary = false;
+  isScrollingService = false;
+  isScrollingStops = false;
+  firstLoad = true;
   u8g2.clearBuffer();
   char msg[60];
   u8g2.setFont(NatRailTall12);
   switch (boardMode) {
     case MODE_RAIL:
       sprintf(msg,"No data available for station code \"%s\".",locationCode);
+      noDataLoaded = true;
       break;
     case MODE_TUBE:
       strcpy(msg,"No data available for the selected station.");
@@ -861,8 +869,10 @@ void showNoDataScreen() {
   centreText(msg,-1);
   u8g2.setFont(NatRailSmall9);
   centreText("Please check you have selected a valid location",14);
-  centreText("Go to the URL below to choose a location...",26);
-  centreText(myUrl,40);
+  centreText("The last data load result was:",27);
+  centreText(jsonKeyBuffer.lastResultMessage,40);
+  sprintf(msg,"Failed server responses: %d",dataLoadFailure);
+  centreText(msg,54);
   u8g2.sendBuffer();
 }
 
@@ -1993,6 +2003,7 @@ void updateRailDepartures() {
   lastDataLoadTime = millis();
   noDataLoaded = false;
   dataLoadSuccess++;
+  dataLoadFailure=0;
   if (station.numServices > maxRailServices) station.numServices = maxRailServices;
 }
 
@@ -2041,6 +2052,7 @@ void updateArrivals() {
   lastDataLoadTime = millis();
   noDataLoaded = false;
   dataLoadSuccess++;
+  dataLoadFailure = 0;
 }
 
 void drawUndergroundService(int serviceId, int y, bool isShowingCurrentLocation = false) {
@@ -2224,6 +2236,7 @@ void updateBusDepartures() {
   lastDataLoadTime = millis();
   noDataLoaded = false;
   dataLoadSuccess++;
+  dataLoadFailure = 0;
   // Work out the max column size for service numbers
   busDestX=0;
   u8g2.setFont(NatRailSmall9);
@@ -2464,8 +2477,8 @@ void handleInfo(AsyncWebServerRequest *request) {
   if (schedulerActive) message+="\nScheduler active, next event at " + String(nextSlotEventTime);
   else if (carouselActive) message+="\nCarousel active, next event at " + String(nextSlotEventTime);
 
-  message+="\nCurrent location code: " + String(locationCode) + "\nCurrent location name: " + String(locationName) + "\nSuccessful: " + String(dataLoadSuccess) + "\nFailures: " + String(dataLoadFailure) + "\nTime since last data load: " + String((int)((millis()-lastDataLoadTime)/1000)) + " seconds";
-  if (dataLoadFailure) message+="\nTime since last failure: " + String((int)((millis()-lastLoadFailure)/1000)) + " seconds";
+  message+="\nCurrent location code: " + String(locationCode) + "\nCurrent location name: " + String(locationName) + "\nSuccessful: " + String(dataLoadSuccess) + "\nFailures: " + String(dataLoadFailureTotal) + "\nTime since last data load: " + String((int)((millis()-lastDataLoadTime)/1000)) + " seconds";
+  if (dataLoadFailureTotal) message+="\nTime since last failure: " + String((int)((millis()-lastLoadFailure)/1000)) + " seconds";
   message+="\nLast Result: ";
   switch (boardMode) {
     case MODE_RAIL:
@@ -2716,20 +2729,23 @@ void departureBoardLoop() {
         lastDataLoadTime = millis();
         noDataLoaded = false;
         dataLoadSuccess++;
+        dataLoadFailure=0;
       } else if (lastUpdateResult == UPD_DATA_ERROR || lastUpdateResult == UPD_TIMEOUT || lastUpdateResult == UPD_HTTP_ERROR) {
         lastLoadFailure=millis();
         dataLoadFailure++;
-        if (noDataLoaded) showNoDataScreen();
+        dataLoadFailureTotal++;
+        if (noDataLoaded || dataLoadFailure>MAX_IGNORED_ERRORS) showNoDataScreen();
       } else if (lastUpdateResult == UPD_UNAUTHORISED) {
         showTokenErrorScreen();
         while (true) { delay(1);}
       } else {
         dataLoadFailure++;
+        dataLoadFailureTotal++;
       }
     }
   }
 
-  if (millis()>timer && numMessages && !isScrollingStops && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR && !noScrolling && !noDataLoaded) {
+  if (millis()>timer && numMessages && !isScrollingStops && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && !noScrolling && !noDataLoaded && dataLoadFailure <= MAX_IGNORED_ERRORS) {
     // Need to start a new scrolling messages line
     prevMessage = currentMessage;
     prevScrollStopsLength = scrollStopsLength;
@@ -2744,7 +2760,7 @@ void departureBoardLoop() {
 
   // Check if there's a via destination
   if (millis()>viaTimer) {
-    if (station.numServices && station.service[0].via[0] && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
+    if (station.numServices && station.service[0].via[0] && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && !noDataLoaded && dataLoadFailure <= MAX_IGNORED_ERRORS) {
       isShowingVia = !isShowingVia;
       drawPrimaryService(isShowingVia);
       u8g2.updateDisplayArea(0,1,32,3);
@@ -2752,7 +2768,7 @@ void departureBoardLoop() {
     }
   }
 
-  if (millis()>serviceTimer && !isScrollingService && !isSleeping && !noServiceClockIsActive && !noDataLoaded && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
+  if (millis()>serviceTimer && !isScrollingService && !isSleeping && !noServiceClockIsActive && !noDataLoaded && lastUpdateResult!=UPD_UNAUTHORISED && !noDataLoaded && dataLoadFailure <= MAX_IGNORED_ERRORS) {
     // Need to change to the next service if there is one
     if ((station.numServices <= 1 || (station.numServices==2 && noScrolling)) && !weatherMsg[0]) {
       // There's no other services and no weather so just so static attribution.
@@ -2824,7 +2840,7 @@ void departureBoardLoop() {
 
   if (!isSleeping) {
     // Check if the clock should be updated
-    if (!firstLoad) drawCurrentTime();
+    if (!firstLoad && dataLoadFailure <= MAX_IGNORED_ERRORS) drawCurrentTime();
 
     // To ensure a consistent refresh rate (for smooth text scrolling), we update the screen every 25ms (around 40fps)
     // so we need to wait any additional ms not used by processing so far before sending the frame to the display controller
@@ -2878,18 +2894,20 @@ void undergroundArrivalsLoop() {
     } else if (lastUpdateResult == UPD_DATA_ERROR || lastUpdateResult == UPD_TIMEOUT || lastUpdateResult == UPD_HTTP_ERROR) {
       lastLoadFailure = millis();
       dataLoadFailure++;
-      if (noDataLoaded) showNoDataScreen(); else drawUndergroundBoard();
+      dataLoadFailureTotal++;
+      if (noDataLoaded || dataLoadFailure>MAX_IGNORED_ERRORS) showNoDataScreen(); else drawUndergroundBoard();
     } else if (lastUpdateResult == UPD_UNAUTHORISED) {
       showTokenErrorScreen();
       while (true) delay(10);
     } else {
       dataLoadFailure++;
+      dataLoadFailureTotal++;
     }
   }
 
   // Check if we're showing currentLocation
   if (showTubeCurrentLocation && millis()>viaTimer) {
-    if (station.numServices && station.origin[0] && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
+    if (station.numServices && station.origin[0] && !isSleeping && lastUpdateResult!=UPD_UNAUTHORISED && !noDataLoaded && dataLoadFailure <= MAX_IGNORED_ERRORS) {
       isShowingVia = !isShowingVia;
       drawUndergroundService(0,ULINE1,isShowingVia);
       u8g2.updateDisplayArea(0,1,32,3);
@@ -2898,7 +2916,7 @@ void undergroundArrivalsLoop() {
   }
 
   // Scrolling the additional services
-  if (millis()>serviceTimer && !isScrollingService && !isSleeping && !noDataLoaded && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
+  if (millis()>serviceTimer && !isScrollingService && !isSleeping && !noDataLoaded && lastUpdateResult!=UPD_UNAUTHORISED && dataLoadFailure <= MAX_IGNORED_ERRORS) {
     if (station.numServices<=2 && numMessages==1 && attributionScrolled) {
       // There are no additional services to scroll in so static attribution.
       serviceTimer = millis() + 30000;
@@ -2998,7 +3016,7 @@ void undergroundArrivalsLoop() {
 
   if (!isSleeping) {
     // Check if the clock should be updated
-    drawCurrentTimeUG();
+    if (!noDataLoaded && dataLoadFailure <= MAX_IGNORED_ERRORS) drawCurrentTimeUG();
 
     delayMs = frameTimeTube - (millis()-refreshTimer);
     if (delayMs>0) delay(delayMs);
@@ -3048,17 +3066,19 @@ void busDeparturesLoop() {
     } else if (lastUpdateResult == UPD_DATA_ERROR || lastUpdateResult == UPD_TIMEOUT || lastUpdateResult == UPD_HTTP_ERROR) {
       lastLoadFailure = millis();
       dataLoadFailure++;
-      if (noDataLoaded) showNoDataScreen(); else drawBusDeparturesBoard();
+      dataLoadFailureTotal++;
+      if (noDataLoaded || dataLoadFailure>MAX_IGNORED_ERRORS) showNoDataScreen(); else drawBusDeparturesBoard();
     } else if (lastUpdateResult == UPD_UNAUTHORISED) {
       showTokenErrorScreen();
       while (true) delay(10);
     } else {
       dataLoadFailure++;
+      dataLoadFailureTotal++;
     }
   }
 
   // Scrolling the additional services
-  if (millis()>serviceTimer && !isScrollingPrimary && !isScrollingService && !isSleeping && !noDataLoaded && lastUpdateResult!=UPD_UNAUTHORISED && lastUpdateResult!=UPD_DATA_ERROR) {
+  if (millis()>serviceTimer && !isScrollingPrimary && !isScrollingService && !isSleeping && !noDataLoaded && lastUpdateResult!=UPD_UNAUTHORISED && dataLoadFailure <= MAX_IGNORED_ERRORS) {
     // Need to change to the next service if there is one
     if (station.numServices<=2 && messages.numMessages==1) {
       // There are no additional services or weather to scroll in so static attribution.
@@ -3143,7 +3163,7 @@ void busDeparturesLoop() {
 
   if (!isSleeping) {
     // just use the Tube clock for bus mode
-    if (drawCurrentTimeUG()) u8g2.setFont(NatRailSmall9);
+    if (!noDataLoaded && dataLoadFailure <= MAX_IGNORED_ERRORS) if (drawCurrentTimeUG()) u8g2.setFont(NatRailSmall9);
 
     delayMs = frameTimeBus - (millis()-refreshTimer);
     if (delayMs>0) delay(delayMs);
